@@ -1,0 +1,18 @@
+{
+  "name": "Cat's Taste 訂單系統",
+  "short_name": "CT訂單",
+  "description": "Cat's Taste 展場送貨訂單記錄工具",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#7aabf0",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "225x225",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
