@@ -1,6 +1,6 @@
 {
-  "name": "Cat's Taste 訂單系統",
-  "short_name": "CT訂單",
+  "name": "Cat's Taste 送貨單系統",
+  "short_name": "Cat's Taste 送貨單系統",
   "description": "Cat's Taste 展場送貨訂單記錄工具",
   "start_url": "./index.html",
   "scope": "./",
