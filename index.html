@@ -443,7 +443,7 @@ const SER=[
 const SURL="https://script.google.com/macros/s/AKfycbxIDvHAy04153u3nZ2SamO0JOkLRS2yrm-4patPt0lwUW0v45vhygynd7cge_jy0DWy/exec";
 let cfg={discountThreshold:150,giftThreshold:150,giftName:"趣味發聲匙扣",freeShipThreshold:800,sheetsUrl:SURL};
 let prods=[],cart={},orders=[],activeSer="全部",activePack="全部",sq="",curOid=null;
-let scanStream=null,scanTimer=null,scanReader=null,scanControls=null,scanBusy=false,holdTimer=null,holdInterval=null;
+let scanStream=null,scanTimer=null,scanFallbackTimer=null,scanReader=null,scanControls=null,scanBusy=false,holdTimer=null,holdInterval=null;
 
 const K=k=>"ct4_"+k;
 function sv(k,v){try{localStorage.setItem(K(k),JSON.stringify(v))}catch(e){}}
@@ -802,8 +802,7 @@ async function toggleScan(){
  document.getElementById("sbtn").textContent="⏹ 停止";
  try{
   const v=document.getElementById("svid");
-  const nativeOk=await startNativeScan(v);
-  if(!nativeOk)await startZxingScan(v);
+  await startZxingScan(v,false);
  }catch(e){toast("無法開啟相機："+e.message,"err");stopScan()}
 }
 async function startNativeScan(v){
@@ -831,14 +830,28 @@ async function startNativeScan(v){
   return false;
  }
 }
-async function startZxingScan(v){
+async function startZxingScan(v,reuseVideo){
+ if(scanReader)return;
  await ldScr("https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js");
  if(!window.ZXing)throw new Error("掃描器載入失敗，請連線後再試");
  scanReader=new ZXing.BrowserMultiFormatReader();
+ const onResult=(result)=>{if(result)hScan(result.getText?result.getText():String(result.text||result))};
  try{
-  scanControls=await scanReader.decodeFromVideoDevice(null,v,(result)=>{if(result)hScan(result.getText?result.getText():String(result.text||result))});
+  if(reuseVideo&&v.srcObject&&scanReader.decodeFromVideoElementContinuously){
+   scanReader.decodeFromVideoElementContinuously(v,onResult);
+   scanControls={stop:()=>scanReader&&scanReader.reset&&scanReader.reset()};
+   toast("已切換 QR 掃描模式","ok");
+  }else if(reuseVideo&&v.srcObject){
+   scanControls=await scanReader.decodeFromVideoElement(v,onResult);
+   toast("已切換 QR 掃描模式","ok");
+  }else{
+   scanControls=await scanReader.decodeFromVideoDevice(null,v,onResult);
+  }
  }catch(e){
-  scanControls=await scanReader.decodeFromVideoElement(v,(result)=>{if(result)hScan(result.getText?result.getText():String(result.text||result))});
+  if(scanReader.decodeFromVideoElementContinuously){
+   scanReader.decodeFromVideoElementContinuously(v,onResult);
+   scanControls={stop:()=>scanReader&&scanReader.reset&&scanReader.reset()};
+  }else scanControls=await scanReader.decodeFromVideoElement(v,onResult);
  }
  scanStream=v.srcObject||scanStream;
 }
@@ -858,6 +871,7 @@ function stopScan(){
  if(scanReader){try{scanReader.reset()}catch(e){}scanReader=null}
  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
  if(scanTimer){clearInterval(scanTimer);scanTimer=null}
+ if(scanFallbackTimer){clearTimeout(scanFallbackTimer);scanFallbackTimer=null}
  scanBusy=false;
  document.getElementById("swrap").style.display="none";
  document.getElementById("sbtn").textContent="📷";

@@ -1,4 +1,4 @@
-const CACHE_NAME = "catstaste-order-v2";
+const CACHE_NAME = "catstaste-order-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
