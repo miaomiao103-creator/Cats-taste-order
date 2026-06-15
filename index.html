@@ -785,15 +785,15 @@ function vDetail(id){
  </div>`;
  const cfm=o.status==="confirmed"||o.status==="shipped",shp=o.status==="shipped";
  h+=`<div style="display:flex;gap:7px;margin-bottom:8px">
-  <button class="btn${cfm?" btn-green":" btn-sec"} btn-sm" onclick="toggleConfirmStatus('${o.id}');closeM('m-detail');vDetail('${o.id}')">${cfm?"✓ 客人已確認":"○ 客人未確認"}</button>
-  <button class="btn${shp?" btn-blue":" btn-sec"} btn-sm" onclick="toggleShipStatus('${o.id}');closeM('m-detail');vDetail('${o.id}')">${shp?"✓ 已發貨":"○ 未發貨"}</button>
+  <button class="btn${cfm?" btn-green":" btn-sec"} btn-sm" onclick="toggleConfirmStatus('${o.id}')">${cfm?"✓ 客人已確認":"○ 客人未確認"}</button>
+  <button class="btn${shp?" btn-blue":" btn-sec"} btn-sm" onclick="toggleShipStatus('${o.id}')">${shp?"✓ 已發貨":"○ 未發貨"}</button>
  </div>`;
  h+=`<button class="btn btn-danger" style="width:100%" onclick="delO('${o.id}')">🗑️ 標記已刪除</button>`;
  document.getElementById("m-db").innerHTML=h;openM("m-detail");
 }
-function setSt(id,st){const o=orders.find(x=>x.id===id);if(o){o.status=st;touchO(o);rOrders();closeM("m-detail");toast("狀態已更新","ok");doSync(o)}}
-function toggleConfirmStatus(id){const o=orders.find(x=>x.id===id);if(o)setSt(id,(o.status==="confirmed"||o.status==="shipped")?"pending":"confirmed")}
-function toggleShipStatus(id){const o=orders.find(x=>x.id===id);if(o)setSt(id,o.status==="shipped"?"confirmed":"shipped")}
+function setSt(id,st,keepOpen){const o=orders.find(x=>x.id===id);if(o){o.status=st;touchO(o);rOrders();if(keepOpen)vDetail(id);else closeM("m-detail");toast("狀態已更新","ok");doSync(o)}}
+function toggleConfirmStatus(id){const o=orders.find(x=>x.id===id);if(o)setSt(id,(o.status==="confirmed"||o.status==="shipped")?"pending":"confirmed",true)}
+function toggleShipStatus(id){const o=orders.find(x=>x.id===id);if(o)setSt(id,o.status==="shipped"?"confirmed":"shipped",true)}
 function delO(id){if(!confirm("標記為已刪除？其他同事同步後都會見到。"))return;setSt(id,"deleted");toast("已標記刪除，將同步到 Sheets","ok")}
 function openOrderEdit(id){
  const o=orders.find(x=>x.id===id);if(!o)return;
