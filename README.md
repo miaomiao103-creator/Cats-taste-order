@@ -47,13 +47,14 @@
 
 1. 喺訂單卡按「快遞」。
 2. 可以手動輸入單號，或者按相機按鈕掃描 barcode / QR code。
-3. 如果 QR code 內容係快遞連結或文字，app 會盡量抽出當中嘅快遞單號。
-4. App 會自動識別：
+3. iPhone Safari 如果即時掃描唔到 QR code，按「相片」用相機影低 QR code，app 會由相片解碼。
+4. 如果 QR code 內容係快遞連結或文字，app 會盡量抽出當中嘅快遞單號。
+5. App 會自動識別：
    - SF / 順豐
    - JD / 京東
    - 其他快遞
-5. 確認後，系統會生成 WhatsApp 快遞通知文字。
-6. 複製後貼去 WhatsApp 通知客人。
+6. 確認後，系統會生成 WhatsApp 快遞通知文字。
+7. 複製後貼去 WhatsApp 通知客人。
 
 ## Google Sheets 同步
 
