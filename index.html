@@ -90,6 +90,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .oh{padding:9px 13px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .oid{font-size:11px;font-weight:700;color:var(--brand)}
 .ocust{font-size:15px;font-weight:700}.otime{font-size:11px;color:var(--t3)}
+.wa-phone{color:var(--brand);text-decoration:none}
+.wa-phone:active{opacity:.75}
 .ostatus{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap}
 .s-pend{background:rgba(210,153,34,.12);color:var(--yellow)}
 .s-conf{background:rgba(63,185,80,.12);color:var(--green)}
@@ -438,16 +440,18 @@ const SER=[
  {l:"福袋",c:"#c0392b",cats:["福袋"]}
 ];
 
-const SURL="https://script.google.com/macros/s/AKfycbxhmQKohp7H01gnBpp4hiVYvU4l6QkB82x8EfpaQN5wMLIqX-4D0SJcjOweo195Hwe5/exec";
+const OLD_SURL="https://script.google.com/macros/s/AKfycbxhmQKohp7H01gnBpp4hiVYvU4l6QkB82x8EfpaQN5wMLIqX-4D0SJcjOweo195Hwe5/exec";
+const SURL="https://script.google.com/macros/s/AKfycbxIDvHAy04153u3nZ2SamO0JOkLRS2yrm-4patPt0lwUW0v45vhygynd7cge_jy0DWy/exec";
 let cfg={discountThreshold:150,giftThreshold:150,giftName:"趣味發聲匙扣",freeShipThreshold:800,sheetsUrl:SURL};
 let prods=[],cart={},orders=[],activeSer="全部",activePack="全部",sq="",curOid=null;
-let scanStream=null,scanTimer=null,holdTimer=null,holdInterval=null;
+let scanStream=null,scanTimer=null,scanReader=null,scanControls=null,scanBusy=false,holdTimer=null,holdInterval=null;
 
 const K=k=>"ct4_"+k;
 function sv(k,v){try{localStorage.setItem(K(k),JSON.stringify(v))}catch(e){}}
 function ld(k,d){try{const v=localStorage.getItem(K(k));return v!=null?JSON.parse(v):d}catch(e){return d}}
 function loadAll(){
  cfg={...cfg,...ld("cfg",{})};prods=ld("prods",FB);orders=ld("orders",[]);cart=ld("cart",{});
+ if(!cfg.sheetsUrl||cfg.sheetsUrl===OLD_SURL){cfg.sheetsUrl=SURL;sv("cfg",cfg)}
  let changed=false;
  orders.forEach(o=>{if(!o.updatedAt){o.updatedAt=o.at||new Date().toISOString();changed=true}if(o.synced==null){o.synced=false;changed=true}if(o.courier==null){o.courier=detC(o.trackingNo||"");changed=true}});
  if(changed)sv("orders",orders);
@@ -641,6 +645,20 @@ function buildWA(o){
  m+="━━━━━━━━━━━━━━\n⚠️ 原箱價優惠不可與九折優惠同時享用\n━━━━━━━━━━━━━━\n請確認以上訂單，謝謝支持 Cat's Taste 🐾";
  return m;
 }
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function waNo(phone){
+ let p=String(phone||"").trim().replace(/[^\d+]/g,"");
+ if(p.startsWith("+"))p=p.slice(1);
+ else if(p.startsWith("00"))p=p.slice(2);
+ if(!p)return "";
+ else if(!p.startsWith("852"))p="852"+p;
+ return p;
+}
+function waPhoneLink(phone){
+ const label=esc(phone||"");
+ const no=waNo(phone);
+ return no?`<a class="wa-phone" href="https://wa.me/${no}" target="_blank" rel="noopener">📞 ${label}</a>`:`📞 ${label}`;
+}
 function detC(tn){
  tn=(tn||"").replace(/\s/g,"").toUpperCase();
  if(/^SF/i.test(tn)||(/^\d{12,15}$/.test(tn)&&/^[789]/.test(tn)))return"sf";
@@ -692,7 +710,7 @@ function rOrders(){
    <div class="oh">
     <div>
      <div class="oid">${o.id}${o.synced?" ☁️":""}</div>
-     <div class="ocust">${o.name} · ${o.phone}</div>
+     <div class="ocust">${esc(o.name)} · ${waPhoneLink(o.phone)}</div>
      ${o.addr?`<div class="otime">📍 ${o.addr}</div>`:""}
      <div class="otime">${fdt(o.at).slice(5)}</div>
     </div>
@@ -732,7 +750,7 @@ function vDetail(id){
  const o=orders.find(x=>x.id===id);if(!o)return;
  document.getElementById("m-dt").innerHTML=`訂單 ${o.id} <button class="mcb" onclick="closeM('m-detail')">✕</button>`;
  let h=`<div style="font-size:13px;color:var(--t2);margin-bottom:8px">📅 ${fdt(o.at)}</div>`;
- h+=`<div style="font-weight:700;margin-bottom:2px">${o.name} · ${o.phone}</div>`;
+ h+=`<div style="font-weight:700;margin-bottom:2px">${esc(o.name)} · ${waPhoneLink(o.phone)}</div>`;
  if(o.addr)h+=`<div style="font-size:13px;color:var(--t2);margin-bottom:8px">📍 ${o.addr}</div>`;
  h+=`<div style="background:var(--sf3);border-radius:var(--rs);padding:10px;margin-bottom:10px">`;
  o.items.forEach(it=>{const nm=it.name.split("\n")[0];if(it.bq>0)h+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px"><span style="flex:1">📦 ${nm} 原箱x${it.bq}</span><span style="color:var(--green)">$${it.bl}</span></div>`;if(it.pq>0)h+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px"><span style="flex:1">🍬 ${nm} 單件x${it.pq}</span><span style="color:#a0c4f8">$${it.pl}</span></div>`});
@@ -747,10 +765,8 @@ function vDetail(id){
   <button class="btn${o.waShip?" btn-blue":" btn-sec"} btn-sm" onclick="toggleWASent('${o.id}','waShip');closeM('m-detail');vDetail('${o.id}')">${o.waShip?"✓ WA快遞已發":"○ 標記WA快遞"}</button>
  </div>`;
  h+=`<div style="display:flex;gap:7px;margin-bottom:8px">
-  <button class="btn btn-sec btn-sm" onclick="setSt('${o.id}','pending')">待確認</button>
   <button class="btn btn-green btn-sm" onclick="setSt('${o.id}','confirmed')">已確認</button>
   <button class="btn btn-blue btn-sm" onclick="setSt('${o.id}','shipped')">已發貨</button>
-  <button class="btn btn-sec btn-sm" onclick="setSt('${o.id}','deleted')">已刪除</button>
  </div>`;
  h+=`<button class="btn btn-danger" style="width:100%" onclick="delO('${o.id}')">🗑️ 標記已刪除</button>`;
  document.getElementById("m-db").innerHTML=h;openM("m-detail");
@@ -786,35 +802,64 @@ async function toggleScan(){
  document.getElementById("swrap").style.display="block";
  document.getElementById("sbtn").textContent="⏹ 停止";
  try{
-  scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}});
-  const v=document.getElementById("svid");v.srcObject=scanStream;await v.play();
-  // Try native BarcodeDetector first
-  if("BarcodeDetector"in window){
-   const bd=new BarcodeDetector({formats:["code_128","code_39","ean_13","ean_8","upc_a","upc_e","itf","codabar","qr_code","data_matrix"]});
-   scanTimer=setInterval(async()=>{try{const r=await bd.detect(v);if(r.length)hScan(r[0].rawValue)}catch(e){}},300);
-  }else{
-   // Load ZXing fallback
-   await ldScr("https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js");
-   const rd=new ZXing.MultiFormatReader(),cvs=document.createElement("canvas"),ctx=cvs.getContext("2d");
-   scanTimer=setInterval(()=>{
-    try{
-     if(v.readyState<2)return;
-     cvs.width=v.videoWidth;cvs.height=v.videoHeight;
-     if(!cvs.width)return;
-     ctx.drawImage(v,0,0);
-     const id=ctx.getImageData(0,0,cvs.width,cvs.height);
-     const src=new ZXing.RGBLuminanceSource(id.data,cvs.width,cvs.height);
-     const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));
-     const r=rd.decode(bmp);if(r)hScan(r.getText());
-    }catch(e){}
-   },300);
-  }
+  const v=document.getElementById("svid");
+  const nativeOk=await startNativeScan(v);
+  if(!nativeOk)await startZxingScan(v);
  }catch(e){toast("無法開啟相機："+e.message,"err");stopScan()}
 }
-function hScan(tn){stopScan();document.getElementById("ti").value=tn;document.getElementById("cbw").innerHTML=cBadge(tn);uTW();toast("掃描成功 ✓","ok")}
+async function startNativeScan(v){
+ if(!("BarcodeDetector"in window))return false;
+ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}});
+ v.srcObject=scanStream;await v.play();
+ try{
+  const want=["qr_code","code_128","code_39","code_93","ean_13","ean_8","upc_a","upc_e","itf","codabar","data_matrix","pdf417"];
+  let formats=want;
+  if(BarcodeDetector.getSupportedFormats){
+   const supported=await BarcodeDetector.getSupportedFormats();
+   formats=want.filter(f=>supported.includes(f));
+   if(!formats.length)formats=supported;
+  }
+  const bd=new BarcodeDetector({formats});
+  scanTimer=setInterval(async()=>{
+   if(scanBusy)return;scanBusy=true;
+   try{const r=await bd.detect(v);if(r.length)hScan(r[0].rawValue)}catch(e){}
+   scanBusy=false;
+  },220);
+  return true;
+ }catch(e){
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
+  v.srcObject=null;
+  return false;
+ }
+}
+async function startZxingScan(v){
+ await ldScr("https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js");
+ if(!window.ZXing)throw new Error("掃描器載入失敗，請連線後再試");
+ scanReader=new ZXing.BrowserMultiFormatReader();
+ try{
+  scanControls=await scanReader.decodeFromVideoDevice(null,v,(result)=>{if(result)hScan(result.getText?result.getText():String(result.text||result))});
+ }catch(e){
+  scanControls=await scanReader.decodeFromVideoElement(v,(result)=>{if(result)hScan(result.getText?result.getText():String(result.text||result))});
+ }
+ scanStream=v.srcObject||scanStream;
+}
+function cleanScanValue(raw){
+ const s=String(raw||"").trim();
+ const compact=s.replace(/\s/g,"").toUpperCase();
+ const sf=compact.match(/SF\d{9,15}|\b[789]\d{11,14}\b/);
+ if(sf)return sf[0];
+ const jd=compact.match(/JD\d{8,20}|[VJ]\d{12,}/);
+ if(jd)return jd[0];
+ const any=compact.match(/[A-Z]{1,3}\d{8,20}|\d{10,20}/);
+ return any?any[0]:s;
+}
+function hScan(tn){const v=cleanScanValue(tn);stopScan();document.getElementById("ti").value=v;document.getElementById("cbw").innerHTML=cBadge(v);uTW();toast("掃描成功 ✓","ok")}
 function stopScan(){
+ if(scanControls){try{scanControls.stop()}catch(e){}scanControls=null}
+ if(scanReader){try{scanReader.reset()}catch(e){}scanReader=null}
  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
  if(scanTimer){clearInterval(scanTimer);scanTimer=null}
+ scanBusy=false;
  document.getElementById("swrap").style.display="none";
  document.getElementById("sbtn").textContent="📷";
 }
@@ -836,9 +881,14 @@ function syncPending(silent){
  q.forEach((o,i)=>setTimeout(()=>doSync(o),i*600));
 }
 function syncAll(){syncPending(false)}
+function syncAndPullOrders(){
+ if(!navigator.onLine){chkNet();return}
+ syncPending(true);
+ setTimeout(()=>pullShared(true),900);
+}
 // Pull shared orders from Sheets (for multi-user sync)
-function pullShared(){
- if(!cfg.sheetsUrl){toast("未設定 Sheets URL","err");return}
+function pullShared(silent){
+ if(!cfg.sheetsUrl){if(!silent)toast("未設定 Sheets URL","err");return}
  setSyncDot("busy");
  fetch(cfg.sheetsUrl+"?action=getOrders")
   .then(r=>r.json()).then(res=>{
@@ -854,11 +904,11 @@ function pullShared(){
     });
     if(added||updated){
      orders.sort((a,b)=>new Date(b.at)-new Date(a.at));
-     sv("orders",orders);rOrders();toast(`已拉取 ${added} 張新訂單，更新 ${updated} 張 ✓`,"ok");
-    }else toast("訂單已是最新","ok");
+     sv("orders",orders);rOrders();if(!silent)toast(`已拉取 ${added} 張新訂單，更新 ${updated} 張 ✓`,"ok");
+    }else if(!silent)toast("訂單已是最新","ok");
     setSyncDot("ok");
    }
-  }).catch(()=>{setSyncDot("err");toast("拉取失敗","err")});
+  }).catch(()=>{setSyncDot("err");if(!silent)toast("拉取失敗","err")});
 }
 function testS(){
  document.getElementById("sstatus").textContent="測試中...";
@@ -937,7 +987,7 @@ function switchTab(n){
  document.querySelectorAll(".tbtn").forEach(b=>b.classList.remove("active"));
  document.getElementById("tp-"+n).classList.add("active");
  document.getElementById("tbtn-"+n).classList.add("active");
- if(n==="orders")rOrders();
+ if(n==="orders"){rOrders();syncAndPullOrders()}
 }
 let _tt;
 function toast(msg,t=""){const el=document.getElementById("toast");el.textContent=msg;el.className="toast "+(t||"");el.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove("show"),2600)}
