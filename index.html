@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Cat's Taste 送貨單系統">
 <meta name="theme-color" content="#7aabf0">
 <link rel="manifest" href="app.webmanifest">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png?v=11">
+<link rel="shortcut icon" type="image/png" href="icon.png?v=11">
+<link rel="apple-touch-icon" href="icon.png?v=11">
 <title>Cat's Taste 送貨單系統</title>
 <style>
 :root{
@@ -89,6 +91,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .oc{background:var(--sf2);border-radius:var(--r);margin-bottom:9px;border:1px solid var(--bd);overflow:hidden}
 .oh{padding:9px 13px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .oid{font-size:11px;font-weight:700;color:var(--brand)}
+.osync{display:inline-flex;align-items:center;margin-left:5px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;vertical-align:middle}
+.osync.synced{color:var(--green);background:rgba(63,185,80,.12)}
+.osync.retry{color:var(--red);background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.35)}
 .ocust{font-size:15px;font-weight:700}.otime{font-size:11px;color:var(--t3)}
 .wa-phone{color:var(--brand);text-decoration:none}
 .wa-phone:active{opacity:.75}
@@ -344,7 +349,7 @@ textarea.mi{resize:none;min-height:55px}
  <div class="mb2">
   <div class="mt">➕ 新增產品 <button class="mcb" onclick="closeM('m-ap')">✕</button></div>
   <div class="slbl">產品名稱</div><input id="np-n" class="mi" type="text" placeholder="名稱" autocomplete="off">
-  <div class="slbl">類別</div><input id="np-c" class="mi" type="text" placeholder="健康 / 主食罐 / 小食...">
+  <div class="slbl">類別</div><input id="np-c" class="mi" type="text" placeholder="健康 / 美味 / 主食罐 / 小食...">
   <div class="prow">
    <div style="flex:1"><div class="slbl">單件價 ($)</div><input id="np-p" class="mi" type="number" placeholder="0" style="margin-bottom:0"></div>
    <div style="flex:1"><div class="slbl">原箱價 ($)</div><input id="np-b" class="mi" type="number" placeholder="－" style="margin-bottom:0"></div>
@@ -412,33 +417,33 @@ const FB=[
 {id:"PSSA",sku:"PSSA",cat:"老年",name:"吞拿魚三文魚啫喱貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
 {id:"PST",sku:"PST",cat:"老年",name:"老年7歲+ 吞拿魚啫喱貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
 {id:"PSK",sku:"PSK",cat:"老年",name:"老年7歲+ 吞拿魚鰹魚啫喱貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJCS",sku:"PJCS",cat:"主食罐",name:"吞拿魚蟹肉啫喱濕貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJK",sku:"PJK",cat:"主食罐",name:"吞拿魚鰹魚啫喱濕貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGS",sku:"PGS",cat:"主食罐",name:"吞拿魚蝦肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGCS",sku:"PGCS",cat:"主食罐",name:"吞拿魚蟹肉肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGK",sku:"PGK",cat:"主食罐",name:"吞拿魚鰹魚肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJSA",sku:"PJSA",cat:"主食罐",name:"吞拿魚三文魚啫喱貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJ",sku:"PJ",cat:"主食罐",name:"吞拿魚啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJSH",sku:"PJSH",cat:"主食罐",name:"吞拿魚白飯魚啫喱貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJS",sku:"PJS",cat:"主食罐",name:"吞拿魚蝦啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PJC",sku:"PJC",cat:"主食罐",name:"吞拿魚雞肉啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGSA",sku:"PGSA",cat:"主食罐",name:"吞拿魚三文魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PG",sku:"PG",cat:"主食罐",name:"吞拿魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGSH",sku:"PGSH",cat:"主食罐",name:"吞拿魚白飯魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"PGC",sku:"PGC",cat:"主食罐",name:"吞拿魚雞肉肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
-{id:"CJ",sku:"CJ",cat:"主食罐",name:"吞拿魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJSH",sku:"CJSH",cat:"主食罐",name:"吞拿魚白飯魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJS",sku:"CJS",cat:"主食罐",name:"吞拿魚蝦啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJCS",sku:"CJCS",cat:"主食罐",name:"吞拿魚蟹肉啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJC",sku:"CJC",cat:"主食罐",name:"吞拿魚雞肉啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJK",sku:"CJK",cat:"主食罐",name:"吞拿魚鰹魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGSA",sku:"CGSA",cat:"主食罐",name:"吞拿魚三文魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGSH",sku:"CGSH",cat:"主食罐",name:"吞拿魚白飯魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGS",sku:"CGS",cat:"主食罐",name:"吞拿魚蝦肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGCS",sku:"CGCS",cat:"主食罐",name:"吞拿魚蟹肉肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGC",sku:"CGC",cat:"主食罐",name:"吞拿魚雞肉肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CGK",sku:"CGK",cat:"主食罐",name:"吞拿魚鰹魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
-{id:"CJSA",sku:"CJSA",cat:"主食罐",name:"吞拿魚三文魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"PJCS",sku:"PJCS",cat:"美味",name:"吞拿魚蟹肉啫喱濕貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJK",sku:"PJK",cat:"美味",name:"吞拿魚鰹魚啫喱濕貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGS",sku:"PGS",cat:"美味",name:"吞拿魚蝦肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGCS",sku:"PGCS",cat:"美味",name:"吞拿魚蟹肉肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGK",sku:"PGK",cat:"美味",name:"吞拿魚鰹魚肉汁貓糧 70g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJSA",sku:"PJSA",cat:"美味",name:"吞拿魚三文魚啫喱貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJ",sku:"PJ",cat:"美味",name:"吞拿魚啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJSH",sku:"PJSH",cat:"美味",name:"吞拿魚白飯魚啫喱貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJS",sku:"PJS",cat:"美味",name:"吞拿魚蝦啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PJC",sku:"PJC",cat:"美味",name:"吞拿魚雞肉啫喱濕貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGSA",sku:"PGSA",cat:"美味",name:"吞拿魚三文魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PG",sku:"PG",cat:"美味",name:"吞拿魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGSH",sku:"PGSH",cat:"美味",name:"吞拿魚白飯魚肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"PGC",sku:"PGC",cat:"美味",name:"吞拿魚雞肉肉汁貓糧 75g",spec:"包裝",up:8,bp:280,bq:48,rem:"原箱價不可與九折同用",on:true},
+{id:"CJ",sku:"CJ",cat:"美味",name:"吞拿魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJSH",sku:"CJSH",cat:"美味",name:"吞拿魚白飯魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJS",sku:"CJS",cat:"美味",name:"吞拿魚蝦啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJCS",sku:"CJCS",cat:"美味",name:"吞拿魚蟹肉啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJC",sku:"CJC",cat:"美味",name:"吞拿魚雞肉啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJK",sku:"CJK",cat:"美味",name:"吞拿魚鰹魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGSA",sku:"CGSA",cat:"美味",name:"吞拿魚三文魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGSH",sku:"CGSH",cat:"美味",name:"吞拿魚白飯魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGS",sku:"CGS",cat:"美味",name:"吞拿魚蝦肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGCS",sku:"CGCS",cat:"美味",name:"吞拿魚蟹肉肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGC",sku:"CGC",cat:"美味",name:"吞拿魚雞肉肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CGK",sku:"CGK",cat:"美味",name:"吞拿魚鰹魚肉汁罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
+{id:"CJSA",sku:"CJSA",cat:"美味",name:"吞拿魚三文魚啫喱罐 85g",spec:"罐裝",up:9,bp:180,bq:24,rem:"原箱價不可與九折同用",on:true},
 {id:"CAAT",sku:"CAAT",cat:"主食罐",name:"無膠肉絲主食罐 淨吞拿魚 85g",spec:"罐裝",up:11,bp:220,bq:24,rem:"原箱價不可與九折同用",on:true},
 {id:"CAASA",sku:"CAASA",cat:"主食罐",name:"無膠肉絲主食罐 吞拿魚三文魚 85g",spec:"罐裝",up:11,bp:220,bq:24,rem:"原箱價不可與九折同用",on:true},
 {id:"CAAB",sku:"CAAB",cat:"主食罐",name:"無膠肉絲主食罐 吞拿魚牛肉 85g",spec:"罐裝",up:11,bp:220,bq:24,rem:"原箱價不可與九折同用",on:true},
@@ -449,13 +454,14 @@ const FB=[
 ];
 
 const SER=[
- {l:"全部",c:"#7aabf0",cats:null},
- {l:"健康",c:"#3fb950",cats:["健康"]},
- {l:"主食罐",c:"#58a6ff",cats:["主食罐"]},
- {l:"幼貓",c:"#f78166",cats:["幼貓"]},
- {l:"老年7+",c:"#bc8cff",cats:["老年"]},
- {l:"小食",c:"#e67e22",cats:["小食"]},
- {l:"玩具",c:"#e8a87c",cats:["玩具"]},
+ {l:"全部",c:"#2f63bd",cats:null},
+ {l:"美味",c:"#f5ad19",cats:["美味"]},
+ {l:"健康",c:"#43a65c",cats:["健康"]},
+ {l:"主食罐",c:"#3b82c4",cats:["主食罐"]},
+ {l:"幼貓",c:"#ef6f9a",cats:["幼貓"]},
+ {l:"老年7+",c:"#9b59b6",cats:["老年"]},
+ {l:"小食",c:"#ff8a00",cats:["小食"]},
+ {l:"玩具",c:"#5b7cfa",cats:["玩具"]},
  {l:"福袋",c:"#c0392b",cats:["福袋"]}
 ];
 
@@ -467,14 +473,30 @@ let scanStream=null,scanTimer=null,scanFallbackTimer=null,scanReader=null,scanCo
 const K=k=>"ct4_"+k;
 function sv(k,v){try{localStorage.setItem(K(k),JSON.stringify(v))}catch(e){}}
 function ld(k,d){try{const v=localStorage.getItem(K(k));return v!=null?JSON.parse(v):d}catch(e){return d}}
+function normProdCats(list){
+ let changed=false;
+ list.forEach(p=>{
+  if(p.cat==="主食罐"&&!/^無膠肉絲主食罐/.test(p.name||"")){
+   p.cat="美味";changed=true;
+  }
+ });
+ return changed;
+}
 function loadAll(){
  cfg={...cfg,...ld("cfg",{})};prods=ld("prods",FB);orders=ld("orders",[]);cart=ld("cart",{});
  if(!cfg.sheetsUrl||/^https:\/\/script\.google\.com\/macros\/s\//.test(cfg.sheetsUrl)){cfg.sheetsUrl=SURL;sv("cfg",cfg)}
+ if(normProdCats(prods))sv("prods",prods);
  let changed=false;
- orders.forEach(o=>{if(!o.updatedAt){o.updatedAt=o.at||new Date().toISOString();changed=true}if(o.synced==null){o.synced=false;changed=true}if(o.courier==null){o.courier=detC(o.trackingNo||"");changed=true}});
+ orders.forEach(o=>{if(!o.updatedAt){o.updatedAt=o.at||new Date().toISOString();changed=true}if(o.synced==null){o.synced=false;changed=true}if(o.syncAttempts==null){o.syncAttempts=0;changed=true}if(o.courier==null){o.courier=detC(o.trackingNo||"");changed=true}});
  if(changed)sv("orders",orders);
 }
-function touchO(o){o.updatedAt=new Date().toISOString();o.courier=detC(o.trackingNo||"");o.synced=false;sv("orders",orders)}
+function touchO(o){o.updatedAt=new Date().toISOString();o.courier=detC(o.trackingNo||"");o.synced=false;o.syncAttempts=0;sv("orders",orders)}
+function touchProducts(){
+ const now=new Date().toISOString();
+ prods.forEach(p=>p.updatedAt=now);
+ cfg.productsUpdatedAt=now;cfg.productsSynced=false;
+ sv("prods",prods);sv("cfg",cfg);
+}
 
 // ─── CART ────────────────────────────────────────
 function gP(id){return prods.find(p=>p.id===id)}
@@ -507,7 +529,7 @@ function smartBox(id){
  const tot=(ci.boxQty||0)*p.bq+(ci.packQty||0);
  const nb=Math.floor(tot/p.bq),rp=tot%p.bq;
  cart[id]={boxQty:nb,packQty:rp};
- sv("cart",cart);rCart();rProds();toast("已轉換："+nb+"箱 + "+rp+"散","ok");
+ sv("cart",cart);rCart();rProds();toast("已轉換："+nb+"原箱 + "+rp+"單件","ok");
 }
 function clearCart(){
  if(!Object.keys(cart).length)return;
@@ -635,7 +657,7 @@ function doSubmit(){
   items:items.map(({id,p,bq,pq,bl,pl,lt})=>({sku:p.sku,name:p.name,bq,pq,bp:p.bp||null,up:p.up,bl,pl,lt})),
   sub,da,tot,freeShip,hasGift,gift:hasGift?cfg.giftName:"",
   status:"pending",trackingNo:"",courier:"",
-  waConf:false,waShip:false,synced:false};
+  waConf:false,waShip:false,synced:false,syncAttempts:0};
  orders.unshift(order);sv("orders",orders);
  cart={};sv("cart",cart);
  ["c-name","c-phone","c-addr"].forEach(id=>document.getElementById(id).value="");
@@ -716,6 +738,11 @@ function cpEl(id){
 }
 
 // ─── ORDERS RENDER ─────────────────────────────────
+function syncBadge(o){
+ if(o.synced)return'<span class="osync synced">☁️</span>';
+ const n=o.syncAttempts||0;
+ return`<span class="osync retry">${n?`Retry x${n}`:"未同步"}</span>`;
+}
 function rOrders(){
  const el=document.getElementById("ol");
  document.getElementById("olbl").textContent=`共 ${orders.length} 張訂單`;
@@ -727,7 +754,7 @@ function rOrders(){
   return`<div class="oc${o.status==="deleted"?" deleted":""}">
    <div class="oh">
     <div>
-     <div class="oid">${o.id}${o.synced?" ☁️":""}</div>
+     <div class="oid">${o.id}${syncBadge(o)}</div>
      <div class="ocust">${esc(o.name)} · ${waPhoneLink(o.phone)}</div>
      ${o.addr?`<div class="otime">📍 ${o.addr}</div>`:""}
      <div class="otime">${fdt(o.at).slice(5)}</div>
@@ -965,10 +992,11 @@ function ldScr(src){return new Promise((r,j)=>{if(document.querySelector(`script
 function doSync(order){
  if(!cfg.sheetsUrl)return;setSyncDot("busy");
  order.courier=detC(order.trackingNo||"");
+ order.syncAttempts=(order.syncAttempts||0)+1;order.synced=false;sv("orders",orders);rOrders();
  fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify({action:"upsertOrder",order}),headers:{"Content-Type":"text/plain"}})
   .then(r=>r.json()).then(res=>{
-   if(res.status==="ok"||res.result==="success"){order.synced=true;if(res.updatedAt)order.updatedAt=res.updatedAt;sv("orders",orders);rOrders();setSyncDot("ok")}
-   else setSyncDot("err");
+   if(res.status==="ok"||res.result==="success"){order.synced=true;order.syncAttempts=0;if(res.updatedAt)order.updatedAt=res.updatedAt;sv("orders",orders);rOrders();setSyncDot("ok")}
+   else{sv("orders",orders);rOrders();setSyncDot("err")}
   }).catch(()=>setSyncDot("err"));
 }
 function syncPending(silent){
@@ -980,6 +1008,7 @@ function syncAll(){syncPending(false)}
 function syncAndPullOrders(){
  if(!navigator.onLine){chkNet();return}
  syncPending(true);
+ syncProducts(true);
  setTimeout(()=>pullShared(true),900);
 }
 function jsonp(url){
@@ -999,16 +1028,43 @@ function sheetGet(action){
  const url=cfg.sheetsUrl+"?action="+encodeURIComponent(action);
  return fetch(url).then(r=>r.json()).catch(()=>jsonp(url));
 }
+function maxProductUpdatedAt(list){return list.reduce((m,p)=>(p.updatedAt||"")>m?p.updatedAt:m,"")}
+function cleanProduct(p){
+ return {...p,up:Number(p.up||0),bp:p.bp==null||p.bp===""?null:Number(p.bp||0),bq:Number(p.bq||0),on:p.on!==false};
+}
+function syncProducts(silent){
+ if(!cfg.sheetsUrl||!cfg.productsUpdatedAt)return Promise.resolve({synced:false});
+ setSyncDot("busy");
+ return fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify({action:"saveProducts",products:prods,updatedAt:cfg.productsUpdatedAt}),headers:{"Content-Type":"text/plain"}})
+  .then(r=>r.json()).then(res=>{
+   if(res.status==="ok"||res.result==="success"){cfg.productsSynced=true;if(res.updatedAt)cfg.productsUpdatedAt=res.updatedAt;sv("cfg",cfg);setSyncDot("ok");if(!silent)toast("產品價錢已同步 ✓","ok");return{synced:true}}
+   cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗","err");return{synced:false};
+  }).catch(()=>{cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗","err");return{synced:false}});
+}
+function pullProducts(silent){
+ if(!cfg.sheetsUrl)return Promise.resolve({updated:0});
+ if(cfg.productsSynced===false)return Promise.resolve({updated:0,skipped:true});
+ return sheetGet("getProducts").then(res=>{
+  const list=Array.isArray(res.products)?res.products:[];
+  if(!list.length)return{updated:0};
+  const rt=res.updatedAt||maxProductUpdatedAt(list),lt=cfg.productsUpdatedAt||"";
+  if(!rt||rt<=lt)return{updated:0};
+  prods=list.map(cleanProduct);cfg.productsUpdatedAt=rt;cfg.productsSynced=true;
+  sv("prods",prods);sv("cfg",cfg);rSerBar();rProds();rCart();rSettings();
+  if(!silent)toast(`已更新 ${prods.length} 款產品價錢 ✓`,"ok");
+  return{updated:prods.length};
+ });
+}
 // Pull shared orders from Sheets (for multi-user sync)
 function pullShared(silent){
  if(!cfg.sheetsUrl){if(!silent)toast("未設定 Sheets URL","err");return}
  setSyncDot("busy");
- sheetGet("getOrders").then(res=>{
+ Promise.all([sheetGet("getOrders"),pullProducts(true)]).then(([res,pr])=>{
    if(res.orders&&Array.isArray(res.orders)){
     let added=0,updated=0;
     const byId=new Map(orders.map(o=>[o.id,o]));
     res.orders.forEach(ro=>{
-     ro.updatedAt=ro.updatedAt||ro.at||new Date().toISOString();ro.synced=true;ro.courier=ro.courier||detC(ro.trackingNo||"");
+     ro.updatedAt=ro.updatedAt||ro.at||new Date().toISOString();ro.synced=true;ro.syncAttempts=0;ro.courier=ro.courier||detC(ro.trackingNo||"");
      const lo=byId.get(ro.id);
      if(!lo){orders.push(ro);added++;return}
      const rt=new Date(ro.updatedAt).getTime(),lt=new Date(lo.updatedAt||lo.at||0).getTime();
@@ -1016,8 +1072,13 @@ function pullShared(silent){
     });
     if(added||updated){
      orders.sort((a,b)=>new Date(b.at)-new Date(a.at));
-     sv("orders",orders);rOrders();if(!silent)toast(`已拉取 ${added} 張新訂單，更新 ${updated} 張 ✓`,"ok");
-    }else if(!silent)toast("訂單已是最新","ok");
+     sv("orders",orders);rOrders();
+    }
+    if(!silent){
+     const pm=pr&&pr.updated?`，產品 ${pr.updated} 款`:"";
+     if(added||updated||pm)toast(`已拉取 ${added} 張新訂單，更新 ${updated} 張${pm} ✓`,"ok");
+     else toast(pr&&pr.skipped?"本機有產品改動未同步，已保留":"訂單及產品已是最新","ok");
+    }
     setSyncDot("ok");
    }
   }).catch(()=>{setSyncDot("err");if(!silent)toast("拉取失敗","err")});
@@ -1049,7 +1110,7 @@ function saveNP(){
  const rem=document.getElementById("np-r").value.trim();
  if(!name||!up){toast("請填寫名稱及單件價","err");return}
  prods.push({id:"C"+Date.now(),sku:"CUSTOM",cat,name,spec:bp?"包裝":"其他",up,bp,bq,rem,on:true});
- sv("prods",prods);rSerBar();rProds();rSettings();closeM("m-ap");toast("已新增 ✓","ok");
+ touchProducts();rSerBar();rProds();rSettings();closeM("m-ap");toast("已新增 ✓","ok");syncProducts(true);
 }
 function oProdAdmin(){
  document.getElementById("m-pab").innerHTML=prods.map(p=>`
@@ -1076,9 +1137,9 @@ function saveEP(){
  p.bp=parseFloat(document.getElementById("ep-b").value)||null;
  p.bq=parseInt(document.getElementById("ep-bq").value)||0;
  p.rem=document.getElementById("ep-r").value.trim();
- sv("prods",prods);rProds();oProdAdmin();closeM("m-ep");toast("已儲存 ✓","ok");
+ touchProducts();rProds();oProdAdmin();closeM("m-ep");toast("已儲存 ✓","ok");syncProducts(true);
 }
-function togOn(id){const p=prods.find(x=>x.id===id);if(p){p.on=!p.on;sv("prods",prods);rSerBar();rProds();oProdAdmin()}}
+function togOn(id){const p=prods.find(x=>x.id===id);if(p){p.on=!p.on;touchProducts();rSerBar();rProds();oProdAdmin();syncProducts(true)}}
 function rSettings(){
  document.getElementById("sd").textContent=cfg.discountThreshold;
  document.getElementById("sg2").textContent=cfg.giftThreshold;

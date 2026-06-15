@@ -1,4 +1,5 @@
 const SHEET_NAME = "Orders";
+const PRODUCT_SHEET_NAME = "Products";
 const HEADERS = [
   "id",
   "at",
@@ -19,11 +20,28 @@ const HEADERS = [
   "waConf",
   "waShip"
 ];
+const PRODUCT_HEADERS = [
+  "id",
+  "sku",
+  "cat",
+  "name",
+  "spec",
+  "up",
+  "bp",
+  "bq",
+  "rem",
+  "on",
+  "updatedAt"
+];
 
 function doGet(e) {
   const action = String((e && e.parameter && e.parameter.action) || "ping");
   const callback = e && e.parameter && e.parameter.callback;
   if (action === "getOrders") return json_({ status: "ok", orders: getOrders_() }, callback);
+  if (action === "getProducts") {
+    const products = getProducts_();
+    return json_({ status: "ok", products, updatedAt: latestProductsUpdatedAt_(products) }, callback);
+  }
   return json_({ status: "ok", result: "success", at: new Date().toISOString() }, callback);
 }
 
@@ -31,6 +49,10 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     const action = String(body.action || "upsertOrder");
+    if (action === "saveProducts") {
+      const saved = saveProducts_(body.products || [], body.updatedAt);
+      return json_({ status: "ok", result: "success", count: saved.count, updatedAt: saved.updatedAt });
+    }
     if (action !== "addOrder" && action !== "upsertOrder") {
       return json_({ status: "error", message: "Unsupported action" });
     }
@@ -76,6 +98,32 @@ function getOrders_() {
   return rows.filter(row => row[0]).map(rowToOrder_);
 }
 
+function saveProducts_(products, updatedAt) {
+  if (!Array.isArray(products)) throw new Error("Products must be an array");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getProductSheet_();
+    const stamp = updatedAt || new Date().toISOString();
+    const rows = products.map(product => productToRow_(product, stamp));
+    sheet.clearContents();
+    sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).setValues([PRODUCT_HEADERS]);
+    if (rows.length) sheet.getRange(2, 1, rows.length, PRODUCT_HEADERS.length).setValues(rows);
+    return { count: rows.length, updatedAt: stamp };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getProducts_() {
+  const sheet = getProductSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const rows = sheet.getRange(2, 1, lastRow - 1, PRODUCT_HEADERS.length).getValues();
+  return rows.filter(row => row[0]).map(rowToProduct_);
+}
+
 function getSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error("Please bind this Apps Script to a Google Sheet.");
@@ -85,6 +133,18 @@ function getSheet_() {
   const current = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
   const hasHeaders = HEADERS.every((header, index) => current[index] === header);
   if (!hasHeaders) sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  return sheet;
+}
+
+function getProductSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error("Please bind this Apps Script to a Google Sheet.");
+  let sheet = ss.getSheetByName(PRODUCT_SHEET_NAME);
+  if (!sheet) sheet = ss.insertSheet(PRODUCT_SHEET_NAME);
+
+  const current = sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).getValues()[0];
+  const hasHeaders = PRODUCT_HEADERS.every((header, index) => current[index] === header);
+  if (!hasHeaders) sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).setValues([PRODUCT_HEADERS]);
   return sheet;
 }
 
@@ -139,6 +199,45 @@ function rowToOrder_(row) {
     waShip: row[17] === true || row[17] === "TRUE",
     synced: true
   };
+}
+
+function productToRow_(product, updatedAt) {
+  return [
+    product.id || "",
+    product.sku || "",
+    product.cat || "",
+    product.name || "",
+    product.spec || "",
+    Number(product.up || 0),
+    product.bp == null || product.bp === "" ? "" : Number(product.bp || 0),
+    Number(product.bq || 0),
+    product.rem || "",
+    product.on !== false,
+    product.updatedAt || updatedAt
+  ];
+}
+
+function rowToProduct_(row) {
+  return {
+    id: String(row[0] || ""),
+    sku: String(row[1] || ""),
+    cat: String(row[2] || ""),
+    name: String(row[3] || ""),
+    spec: String(row[4] || ""),
+    up: Number(row[5] || 0),
+    bp: row[6] === "" ? null : Number(row[6] || 0),
+    bq: Number(row[7] || 0),
+    rem: String(row[8] || ""),
+    on: row[9] !== false && row[9] !== "FALSE",
+    updatedAt: row[10] || ""
+  };
+}
+
+function latestProductsUpdatedAt_(products) {
+  return products.reduce((latest, product) => {
+    const stamp = String(product.updatedAt || "");
+    return stamp > latest ? stamp : latest;
+  }, "");
 }
 
 function parseItems_(value) {
