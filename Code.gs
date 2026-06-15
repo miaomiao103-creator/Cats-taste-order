@@ -22,8 +22,9 @@ const HEADERS = [
 
 function doGet(e) {
   const action = String((e && e.parameter && e.parameter.action) || "ping");
-  if (action === "getOrders") return json_({ status: "ok", orders: getOrders_() });
-  return json_({ status: "ok", result: "success", at: new Date().toISOString() });
+  const callback = e && e.parameter && e.parameter.callback;
+  if (action === "getOrders") return json_({ status: "ok", orders: getOrders_() }, callback);
+  return json_({ status: "ok", result: "success", at: new Date().toISOString() }, callback);
 }
 
 function doPost(e) {
@@ -156,8 +157,14 @@ function detectCourier_(trackingNo) {
   return tn ? "oth" : "";
 }
 
-function json_(payload) {
+function json_(payload, callback) {
+  const body = JSON.stringify(payload);
+  if (callback) {
+    return ContentService
+      .createTextOutput(String(callback).replace(/[^\w.$]/g, "") + "(" + body + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   return ContentService
-    .createTextOutput(JSON.stringify(payload))
+    .createTextOutput(body)
     .setMimeType(ContentService.MimeType.JSON);
 }

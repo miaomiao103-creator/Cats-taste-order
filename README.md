@@ -62,17 +62,19 @@
 2. 到「擴充功能」>「Apps Script」。
 3. 將 `Code.gs` 內容貼入 Apps Script。
 4. 儲存後部署為 Web App。
-5. 權限建議：
+5. 如之後更新過 `Code.gs`，要到「部署」>「管理部署」>「編輯」>「版本」選「新版本」再部署；否則手機仍會跑舊 Apps Script，可能會拉取失敗。
+6. 權限建議：
    - Execute as：Me
    - Who has access：Anyone with the link
-6. 複製 Web App URL。
-7. 回到 app「後台」>「Google Sheets」>「Web App」，貼上 URL。
-8. 按「測試連接」，見到成功就可以用。
+7. 複製 Web App URL。
+8. 回到 app「後台」>「Google Sheets」>「Web App」，貼上 URL。
+9. 按「測試連接」，見到成功就可以用。
 
 ### 日常同步
 - 有網絡時，落單、改狀態、標記 WA、填快遞會自動嘗試同步。
 - 如果場內網絡差，可先照常落單；見到網絡恢復後，按訂單頁右上角雲端同步按鈕。
 - 如另一部手機有新訂單或更新，按訂單頁右上角拉取按鈕。
+- 如果手機主畫面 app 一直用舊設定，先關閉再重開；仍然唔得就刪除主畫面 icon，再用 Safari/Chrome 重新加入主畫面。
 
 ## 注意事項
 
