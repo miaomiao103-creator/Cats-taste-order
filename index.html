@@ -243,6 +243,9 @@ textarea.mi{resize:none;min-height:55px}
     <div class="sg"><div class="sgt">Google Sheets</div><div class="scard">
      <div class="srow" onclick="eCfgS('sheetsUrl','Web App URL')"><div class="si">☁️</div><div class="st"><div class="ti">Web App</div><div class="su" id="surl">已連接</div></div><div class="sa">修改</div></div>
      <div class="srow" onclick="testS()"><div class="si">🔌</div><div class="st"><div class="ti">測試連接</div><div class="su" id="sstatus">未測試</div></div></div>
+     <div class="srow" onclick="ensureSheets(false)"><div class="si">📄</div><div class="st"><div class="ti">建立 / 檢查 Sheets 分頁</div><div class="su">自動建立 Orders + PRODUCTS</div></div><div class="sa">建立</div></div>
+     <div class="srow" onclick="syncProducts(false,true)"><div class="si">📦</div><div class="st"><div class="ti">同步產品到 Sheets</div><div class="su">將本機產品寫入 PRODUCTS 分頁</div></div><div class="sa">同步</div></div>
+     <div class="srow" onclick="pullProducts(false,true)"><div class="si">⬇️</div><div class="st"><div class="ti">從 Sheets 更新產品</div><div class="su">由 PRODUCTS 分頁拉回本機</div></div><div class="sa">拉取</div></div>
     </div></div>
     <div class="sg"><div class="sgt">資料</div><div class="scard">
      <div class="srow" onclick="exportJ()"><div class="si">💾</div><div class="st"><div class="ti">匯出訂單 JSON</div></div></div>
@@ -1030,11 +1033,11 @@ function syncPending(silent){
  if(!silent)toast(`同步 ${q.length} 張...`);
  q.forEach((o,i)=>setTimeout(()=>doSync(o),i*600));
 }
-function syncAll(){syncPending(false)}
+function syncAll(){syncPending(false);syncProducts(true,!cfg.productsUpdatedAt)}
 function syncAndPullOrders(){
  if(!navigator.onLine){chkNet();return}
  syncPending(true);
- syncProducts(true);
+ syncProducts(true,!cfg.productsUpdatedAt);
  setTimeout(()=>pullShared(true),900);
 }
 function jsonp(url){
@@ -1058,24 +1061,46 @@ function maxProductUpdatedAt(list){return list.reduce((m,p)=>(p.updatedAt||"")>m
 function cleanProduct(p){
  return {...p,up:Number(p.up||0),bp:p.bp==null||p.bp===""?null:Number(p.bp||0),bq:Number(p.bq||0),on:p.on!==false};
 }
-function syncProducts(silent){
- if(!cfg.sheetsUrl||!cfg.productsUpdatedAt)return Promise.resolve({synced:false});
+function ensureSheets(silent){
+ if(!cfg.sheetsUrl){if(!silent)toast("未設定 Sheets URL","err");return Promise.resolve({ok:false})}
+ setSyncDot("busy");
+ return sheetGet("ensureSheets").then(res=>{
+  if(res.status==="ok"||res.result==="success"){
+   setSyncDot("ok");
+   if(!silent)toast(`Sheets 已準備：${res.orderSheet||"Orders"} + ${res.productSheet||"PRODUCTS"} ✓`,"ok");
+   return res;
+  }
+  throw new Error(res.message||"setup failed");
+ }).catch(err=>{
+  setSyncDot("err");
+  if(!silent)toast("建立 Sheets 分頁失敗："+(err&&err.message?err.message:err),"err");
+  throw err;
+ });
+}
+function syncProducts(silent,force){
+ if(!cfg.sheetsUrl)return Promise.resolve({synced:false});
+ if(force&&!cfg.productsUpdatedAt){
+  const now=new Date().toISOString();
+  prods.forEach(p=>{if(!p.updatedAt)p.updatedAt=now});
+  cfg.productsUpdatedAt=now;cfg.productsSynced=false;sv("prods",prods);sv("cfg",cfg);
+ }
+ if(!cfg.productsUpdatedAt)return Promise.resolve({synced:false,skipped:true});
  setSyncDot("busy");
  return fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify({action:"saveProducts",products:prods,updatedAt:cfg.productsUpdatedAt}),headers:{"Content-Type":"text/plain"}})
   .then(r=>r.json()).then(res=>{
-   if(res.status==="ok"||res.result==="success"){cfg.productsSynced=true;if(res.updatedAt)cfg.productsUpdatedAt=res.updatedAt;sv("cfg",cfg);setSyncDot("ok");if(!silent)toast("產品價錢已同步 ✓","ok");return{synced:true}}
-   cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗","err");return{synced:false};
-  }).catch(()=>{cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗","err");return{synced:false}});
+   if(res.status==="ok"||res.result==="success"){cfg.productsSynced=true;if(res.updatedAt)cfg.productsUpdatedAt=res.updatedAt;sv("cfg",cfg);setSyncDot("ok");if(!silent)toast(`產品已同步到 PRODUCTS：${res.count||prods.length} 款 ✓`,"ok");return{synced:true,count:res.count||prods.length}}
+   cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗："+(res.message||"unknown error"),"err");return{synced:false};
+  }).catch(err=>{cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗："+(err&&err.message?err.message:err),"err");return{synced:false}});
 }
-function pullProducts(silent){
+function pullProducts(silent,force){
  if(!cfg.sheetsUrl)return Promise.resolve({updated:0});
- if(cfg.productsSynced===false)return Promise.resolve({updated:0,skipped:true});
+ if(cfg.productsSynced===false&&!force)return Promise.resolve({updated:0,skipped:true});
  return sheetGet("getProducts").then(res=>{
   const list=Array.isArray(res.products)?res.products:[];
-  if(!list.length)return{updated:0};
+  if(!list.length){if(!silent)toast("PRODUCTS 分頁暫時未有產品，請先同步產品到 Sheets","err");return{updated:0};}
   const rt=res.updatedAt||maxProductUpdatedAt(list),lt=cfg.productsUpdatedAt||"";
-  if(!rt||rt<=lt)return{updated:0};
-  prods=list.map(cleanProduct);cfg.productsUpdatedAt=rt;cfg.productsSynced=true;
+  if(!force&&(!rt||rt<=lt)){if(!silent)toast("產品已是最新","ok");return{updated:0};}
+  prods=list.map(cleanProduct);cfg.productsUpdatedAt=rt||new Date().toISOString();cfg.productsSynced=true;
   sv("prods",prods);sv("cfg",cfg);rSerBar();rProds();rCart();rSettings();
   if(!silent)toast(`已更新 ${prods.length} 款產品價錢 ✓`,"ok");
   return{updated:prods.length};
@@ -1085,7 +1110,12 @@ function pullProducts(silent){
 function pullShared(silent){
  if(!cfg.sheetsUrl){if(!silent)toast("未設定 Sheets URL","err");return}
  setSyncDot("busy");
- Promise.all([sheetGet("getOrders"),pullProducts(true)]).then(([res,pr])=>{
+ const prepProducts = (cfg.productsSynced===false || !cfg.productsUpdatedAt)
+   ? syncProducts(true,true)
+   : Promise.resolve({synced:false});
+ prepProducts
+  .then(()=>Promise.all([sheetGet("getOrders"),pullProducts(true,true)]))
+  .then(([res,pr])=>{
    if(res.orders&&Array.isArray(res.orders)){
     let added=0,updated=0;
     const byId=new Map(orders.map(o=>[o.id,o]));
@@ -1103,15 +1133,18 @@ function pullShared(silent){
     if(!silent){
      const pm=pr&&pr.updated?`，產品 ${pr.updated} 款`:"";
      if(added||updated||pm)toast(`已拉取 ${added} 張新訂單，更新 ${updated} 張${pm} ✓`,"ok");
-     else toast(pr&&pr.skipped?"本機有產品改動未同步，已保留":"訂單及產品已是最新","ok");
+     else toast("訂單及產品已是最新","ok");
     }
     setSyncDot("ok");
    }
-  }).catch(()=>{setSyncDot("err");if(!silent)toast("拉取失敗","err")});
+  }).catch(err=>{setSyncDot("err");if(!silent)toast("拉取失敗："+(err&&err.message?err.message:err),"err")});
 }
 function testS(){
  document.getElementById("sstatus").textContent="測試中...";
- sheetGet("ping").then(()=>{document.getElementById("sstatus").textContent="連接成功 ✓";setSyncDot("ok");toast("Sheets 連接成功 ✓","ok")}).catch(()=>{document.getElementById("sstatus").textContent="連接失敗";setSyncDot("err");toast("連接失敗","err")});
+ ensureSheets(true)
+  .then(()=>syncProducts(true,!cfg.productsUpdatedAt))
+  .then(()=>{document.getElementById("sstatus").textContent="連接成功，Orders + PRODUCTS 已準備 ✓";setSyncDot("ok");toast("Sheets 連接成功 ✓","ok")})
+  .catch(()=>{document.getElementById("sstatus").textContent="連接失敗";setSyncDot("err");toast("連接失敗，請檢查 Web App URL / 部署權限","err")});
 }
 function setSyncDot(s){const d=document.getElementById("sdot"),l=document.getElementById("slbl");d.className="sdot "+s;l.textContent=s==="ok"?"已同步":s==="busy"?"同步中...":s==="err"?"未同步":"離線"}
 
