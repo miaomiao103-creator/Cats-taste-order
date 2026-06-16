@@ -1,4 +1,4 @@
-const CACHE_NAME = "catstaste-order-v12";
+const CACHE_NAME = "catstaste-order-v13";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -32,6 +32,17 @@ self.addEventListener("fetch", event => {
           return res;
         }).catch(() => caches.match(req))
       )
+    );
+    return;
+  }
+
+  if (url.origin === location.origin && req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
+        return res;
+      }).catch(() => caches.match("./index.html"))
     );
     return;
   }

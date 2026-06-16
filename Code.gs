@@ -49,22 +49,115 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     const action = String(body.action || "upsertOrder");
+
     if (action === "saveProducts") {
       const saved = saveProducts_(body.products || [], body.updatedAt);
       return json_({ status: "ok", result: "success", count: saved.count, updatedAt: saved.updatedAt });
     }
+
     if (action !== "addOrder" && action !== "upsertOrder") {
       return json_({ status: "error", message: "Unsupported action" });
     }
-    const saved = upsertOrder_(body.order || {});
+
+    const saved = upsertOrder_(normaliseIncomingOrder_(body));
     return json_({ status: "ok", result: "success", id: saved.id, updatedAt: saved.updatedAt });
   } catch (err) {
     return json_({ status: "error", message: err && err.message ? err.message : String(err) });
   }
 }
 
+function normaliseIncomingOrder_(body) {
+  if (!body || typeof body !== "object") throw new Error("Missing request body");
+
+  // Frontend may send either:
+  // 1) { action: "upsertOrder", order: {...} }
+  // 2) { action: "upsertOrder", id: "...", name: "...", ... }
+  const source = body.order && typeof body.order === "object" ? body.order : body;
+  const order = Object.assign({}, source);
+
+  delete order.action;
+  delete order.products;
+
+  normaliseOrderAliases_(order);
+
+  if (!hasMeaningfulOrderData_(order)) {
+    throw new Error("Missing order data");
+  }
+
+  order.id = String(
+    order.id ||
+    order.orderId ||
+    order.orderID ||
+    order.orderNo ||
+    order.orderNumber ||
+    order.localId ||
+    ""
+  ).trim();
+
+  if (!order.id) order.id = makeOrderId_(order);
+  if (!order.at) order.at = new Date().toISOString();
+
+  return order;
+}
+
+function normaliseOrderAliases_(order) {
+  order.name = order.name || order.customerName || order.customer || order.recipientName || "";
+  order.phone = order.phone || order.tel || order.mobile || order.customerPhone || "";
+  order.addr = order.addr || order.address || order.deliveryAddress || order.shippingAddress || "";
+
+  if (order.sub == null || order.sub === "") order.sub = order.subtotal || order.originalTotal || 0;
+  if (order.da == null || order.da === "") order.da = order.discountAmount || order.discount || 0;
+  if (order.tot == null || order.tot === "") order.tot = order.total || order.amount || order.grandTotal || 0;
+
+  if (!Array.isArray(order.items)) {
+    if (Array.isArray(order.cart)) order.items = order.cart;
+    else if (Array.isArray(order.orderItems)) order.items = order.orderItems;
+    else order.items = [];
+  }
+}
+
+function hasMeaningfulOrderData_(order) {
+  return Boolean(
+    order.id ||
+    order.orderId ||
+    order.orderID ||
+    order.orderNo ||
+    order.orderNumber ||
+    order.localId ||
+    order.name ||
+    order.phone ||
+    order.addr ||
+    order.trackingNo ||
+    (Array.isArray(order.items) && order.items.length) ||
+    Number(order.tot || order.total || order.amount || 0)
+  );
+}
+
+function makeOrderId_(order) {
+  // Stable fallback id: retrying the same offline order should not create easy duplicates.
+  const seed = [
+    order.at || "",
+    order.createdAt || "",
+    order.phone || "",
+    order.addr || "",
+    JSON.stringify(order.items || []),
+    order.tot || ""
+  ].join("|");
+
+  if (seed.replace(/[|\s]/g, "")) {
+    const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, seed);
+    const hex = digest.map(function(byte) {
+      const value = byte < 0 ? byte + 256 : byte;
+      return ("0" + value.toString(16)).slice(-2);
+    }).join("").slice(0, 12);
+    return "CT-" + hex;
+  }
+
+  return "CT-" + new Date().getTime() + "-" + Utilities.getUuid().slice(0, 8);
+}
+
 function upsertOrder_(order) {
-  if (!order.id) throw new Error("Missing order id");
+  order = normaliseIncomingOrder_({ order: order });
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -267,3 +360,44 @@ function json_(payload, callback) {
     .createTextOutput(body)
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+function testDoPost_upsertOrder() {
+  const fakeEvent = {
+    postData: {
+      contents: JSON.stringify({
+        action: "upsertOrder",
+        order: {
+          id: "TEST-001",
+          at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          name: "Test Customer",
+          phone: "91234567",
+          addr: "Test Address",
+          items: [
+            { sku: "P001", name: "Test Product", bq: 0, pq: 1, up: 120, bl: 0, pl: 120, lt: 120 }
+          ],
+          sub: 120,
+          da: 0,
+          tot: 120,
+          freeShip: false,
+          hasGift: false,
+          gift: "",
+          status: "pending",
+          trackingNo: "",
+          courier: "",
+          waConf: false,
+          waShip: false
+        }
+      })
+    }
+  };
+  const result = doPost(fakeEvent);
+  Logger.log(result.getContent());
+}
+
+function testDoPost_emptyShouldFail() {
+  const fakeEvent = { postData: { contents: JSON.stringify({ action: "upsertOrder" }) } };
+  const result = doPost(fakeEvent);
+  Logger.log(result.getContent());
+}
+

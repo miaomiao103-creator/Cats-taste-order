@@ -484,7 +484,7 @@ function normProdCats(list){
 }
 function loadAll(){
  cfg={...cfg,...ld("cfg",{})};prods=ld("prods",FB);orders=ld("orders",[]);cart=ld("cart",{});
- if(!cfg.sheetsUrl||/^https:\/\/script\.google\.com\/macros\/s\//.test(cfg.sheetsUrl)){cfg.sheetsUrl=SURL;sv("cfg",cfg)}
+ if(!cfg.sheetsUrl){cfg.sheetsUrl=SURL;sv("cfg",cfg)}
  if(normProdCats(prods))sv("prods",prods);
  let changed=false;
  orders.forEach(o=>{if(!o.updatedAt){o.updatedAt=o.at||new Date().toISOString();changed=true}if(o.synced==null){o.synced=false;changed=true}if(o.syncAttempts==null){o.syncAttempts=0;changed=true}if(o.courier==null){o.courier=detC(o.trackingNo||"");changed=true}});
@@ -990,14 +990,40 @@ function ldScr(src){return new Promise((r,j)=>{if(document.querySelector(`script
 
 // ─── GOOGLE SHEETS ─────────────────────────────────
 function doSync(order){
- if(!cfg.sheetsUrl)return;setSyncDot("busy");
+ if(!cfg.sheetsUrl)return;
+ if(!order||typeof order!=="object"){setSyncDot("err");toast("同步失敗：訂單資料不存在","err");return}
+ if(!order.id)order.id=genId();
+ if(!order.at)order.at=new Date().toISOString();
+ if(!order.updatedAt)order.updatedAt=order.at;
+ setSyncDot("busy");
  order.courier=detC(order.trackingNo||"");
- order.syncAttempts=(order.syncAttempts||0)+1;order.synced=false;sv("orders",orders);rOrders();
- fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify({action:"upsertOrder",order}),headers:{"Content-Type":"text/plain"}})
-  .then(r=>r.json()).then(res=>{
-   if(res.status==="ok"||res.result==="success"){order.synced=true;order.syncAttempts=0;if(res.updatedAt)order.updatedAt=res.updatedAt;sv("orders",orders);rOrders();setSyncDot("ok")}
-   else{sv("orders",orders);rOrders();setSyncDot("err")}
-  }).catch(()=>setSyncDot("err"));
+ order.syncAttempts=(order.syncAttempts||0)+1;order.synced=false;order.lastSyncError="";
+ sv("orders",orders);rOrders();
+ const payload={action:"upsertOrder",order};
+ fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify(payload),headers:{"Content-Type":"text/plain"},cache:"no-store"})
+  .then(async r=>{
+   const text=await r.text();
+   try{return JSON.parse(text)}
+   catch(e){throw new Error(text.slice(0,160)||("HTTP "+r.status))}
+  })
+  .then(res=>{
+   if(res.status==="ok"||res.result==="success"){
+    order.synced=true;order.syncAttempts=0;order.lastSyncError="";
+    if(res.id)order.id=res.id;
+    if(res.updatedAt)order.updatedAt=res.updatedAt;
+    sv("orders",orders);rOrders();setSyncDot("ok");
+   }else{
+    order.lastSyncError=res.message||"Unknown sync error";
+    sv("orders",orders);rOrders();setSyncDot("err");
+    console.warn("Order sync failed",res,payload);
+    toast("同步失敗："+order.lastSyncError,"err");
+   }
+  })
+  .catch(err=>{
+   order.lastSyncError=err&&err.message?err.message:String(err);
+   sv("orders",orders);rOrders();setSyncDot("err");
+   console.warn("Order sync error",err,payload);
+  });
 }
 function syncPending(silent){
  const q=orders.filter(o=>!o.synced);if(!q.length){if(!silent)toast("所有訂單已同步 ✓","ok");return}
