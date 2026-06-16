@@ -1,5 +1,6 @@
 const SHEET_NAME = "Orders";
-const PRODUCT_SHEET_NAME = "Products";
+const PRODUCT_SHEET_NAME = "PRODUCTS";
+const PRODUCT_SHEET_ALIASES = ["Products", "products"];
 const HEADERS = [
   "id",
   "at",
@@ -37,6 +38,11 @@ const PRODUCT_HEADERS = [
 function doGet(e) {
   const action = String((e && e.parameter && e.parameter.action) || "ping");
   const callback = e && e.parameter && e.parameter.callback;
+
+  if (action === "ensureSheets" || action === "setup") {
+    return json_(Object.assign({ status: "ok", result: "success" }, ensureSheets_()), callback);
+  }
+
   if (action === "getOrders") return json_({ status: "ok", orders: getOrders_() }, callback);
   if (action === "getProducts") {
     const products = getProducts_();
@@ -52,7 +58,7 @@ function doPost(e) {
 
     if (action === "saveProducts") {
       const saved = saveProducts_(body.products || [], body.updatedAt);
-      return json_({ status: "ok", result: "success", count: saved.count, updatedAt: saved.updatedAt });
+      return json_({ status: "ok", result: "success", count: saved.count, updatedAt: saved.updatedAt, sheetName: saved.sheetName || PRODUCT_SHEET_NAME });
     }
 
     if (action !== "addOrder" && action !== "upsertOrder") {
@@ -183,6 +189,21 @@ function upsertOrder_(order) {
   }
 }
 
+function ensureSheets_() {
+  const orderSheet = getSheet_();
+  const productSheet = getProductSheet_();
+  return {
+    orderSheet: orderSheet.getName(),
+    productSheet: productSheet.getName(),
+    orderRows: Math.max(orderSheet.getLastRow() - 1, 0),
+    productRows: Math.max(productSheet.getLastRow() - 1, 0),
+    headers: {
+      orders: HEADERS,
+      products: PRODUCT_HEADERS
+    }
+  };
+}
+
 function getOrders_() {
   const sheet = getSheet_();
   const lastRow = sheet.getLastRow();
@@ -203,7 +224,8 @@ function saveProducts_(products, updatedAt) {
     sheet.clearContents();
     sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).setValues([PRODUCT_HEADERS]);
     if (rows.length) sheet.getRange(2, 1, rows.length, PRODUCT_HEADERS.length).setValues(rows);
-    return { count: rows.length, updatedAt: stamp };
+    SpreadsheetApp.flush();
+    return { count: rows.length, updatedAt: stamp, sheetName: sheet.getName() };
   } finally {
     lock.releaseLock();
   }
@@ -232,7 +254,26 @@ function getSheet_() {
 function getProductSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error("Please bind this Apps Script to a Google Sheet.");
+
   let sheet = ss.getSheetByName(PRODUCT_SHEET_NAME);
+
+  // Backward compatibility: older versions created a tab called "Products".
+  // Reuse/rename it so the final tab is consistently "PRODUCTS".
+  if (!sheet) {
+    for (let i = 0; i < PRODUCT_SHEET_ALIASES.length; i++) {
+      const candidate = ss.getSheetByName(PRODUCT_SHEET_ALIASES[i]);
+      if (candidate) {
+        sheet = candidate;
+        try {
+          sheet.setName(PRODUCT_SHEET_NAME);
+        } catch (err) {
+          // If a PRODUCTS sheet already exists or rename is blocked, continue using the candidate.
+        }
+        break;
+      }
+    }
+  }
+
   if (!sheet) sheet = ss.insertSheet(PRODUCT_SHEET_NAME);
 
   const current = sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).getValues()[0];
@@ -401,3 +442,35 @@ function testDoPost_emptyShouldFail() {
   Logger.log(result.getContent());
 }
 
+
+function testEnsureSheets() {
+  const result = doGet({ parameter: { action: "ensureSheets" } });
+  Logger.log(result.getContent());
+}
+
+function testDoPost_saveProducts() {
+  const fakeEvent = {
+    postData: {
+      contents: JSON.stringify({
+        action: "saveProducts",
+        updatedAt: new Date().toISOString(),
+        products: [
+          {
+            id: "TEST-PRODUCT-001",
+            sku: "TEST-SKU",
+            cat: "測試分類",
+            name: "Test Product",
+            spec: "測試規格",
+            up: 12,
+            bp: 120,
+            bq: 12,
+            rem: "",
+            on: true
+          }
+        ]
+      })
+    }
+  };
+  const result = doPost(fakeEvent);
+  Logger.log(result.getContent());
+}

@@ -992,6 +992,30 @@ function stopScan(){
 function ldScr(src){return new Promise((r,j)=>{if(document.querySelector(`script[src="${src}"]`)){r();return}const s=document.createElement("script");s.src=src;s.onload=r;s.onerror=j;document.head.appendChild(s)})}
 
 // ─── GOOGLE SHEETS ─────────────────────────────────
+function parseSheetPostResponse(text,status){
+ if(!text)return{status:"ok",result:"empty_response"};
+ try{return JSON.parse(text)}
+ catch(e){
+  const cleaned=String(text||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,180);
+  throw new Error(cleaned||("HTTP "+status));
+ }
+}
+function postSheet(payload){
+ if(!cfg.sheetsUrl)return Promise.resolve({status:"error",message:"未設定 Sheets URL"});
+ const normalOpt={method:"POST",body:JSON.stringify(payload),headers:{"Content-Type":"text/plain"},cache:"no-store",redirect:"follow"};
+ return fetch(cfg.sheetsUrl,normalOpt)
+  .then(async r=>parseSheetPostResponse(await r.text(),r.status))
+  .catch(err=>{
+   const msg=err&&err.message?err.message:String(err);
+   console.warn("Sheets POST cannot read response; retrying with no-cors",msg,payload);
+   // Google Apps Script Web App can receive the POST but block the browser from reading the response because of CORS/redirects.
+   // no-cors sends the data as a simple text/plain request, then treats the opaque response as accepted.
+   return fetch(cfg.sheetsUrl,{method:"POST",mode:"no-cors",body:JSON.stringify(payload),headers:{"Content-Type":"text/plain"},cache:"no-store"})
+    .then(()=>({status:"ok",result:"sent_no_cors",blind:true,message:"已送出，但瀏覽器不能讀取 Apps Script 回覆"}))
+    .catch(err2=>{throw new Error((err2&&err2.message?err2.message:String(err2))||msg)});
+  });
+}
+function postOk(res){return !!res&&(res.status==="ok"||res.result==="success"||res.blind===true)}
 function doSync(order){
  if(!cfg.sheetsUrl)return;
  if(!order||typeof order!=="object"){setSyncDot("err");toast("同步失敗：訂單資料不存在","err");return}
@@ -1003,15 +1027,10 @@ function doSync(order){
  order.syncAttempts=(order.syncAttempts||0)+1;order.synced=false;order.lastSyncError="";
  sv("orders",orders);rOrders();
  const payload={action:"upsertOrder",order};
- fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify(payload),headers:{"Content-Type":"text/plain"},cache:"no-store"})
-  .then(async r=>{
-   const text=await r.text();
-   try{return JSON.parse(text)}
-   catch(e){throw new Error(text.slice(0,160)||("HTTP "+r.status))}
-  })
+ postSheet(payload)
   .then(res=>{
-   if(res.status==="ok"||res.result==="success"){
-    order.synced=true;order.syncAttempts=0;order.lastSyncError="";
+   if(postOk(res)){
+    order.synced=true;order.syncAttempts=0;order.lastSyncError=res.blind?"已用 no-cors 送出，不能讀取回覆":"";
     if(res.id)order.id=res.id;
     if(res.updatedAt)order.updatedAt=res.updatedAt;
     sv("orders",orders);rOrders();setSyncDot("ok");
@@ -1086,11 +1105,26 @@ function syncProducts(silent,force){
  }
  if(!cfg.productsUpdatedAt)return Promise.resolve({synced:false,skipped:true});
  setSyncDot("busy");
- return fetch(cfg.sheetsUrl,{method:"POST",body:JSON.stringify({action:"saveProducts",products:prods,updatedAt:cfg.productsUpdatedAt}),headers:{"Content-Type":"text/plain"}})
-  .then(r=>r.json()).then(res=>{
-   if(res.status==="ok"||res.result==="success"){cfg.productsSynced=true;if(res.updatedAt)cfg.productsUpdatedAt=res.updatedAt;sv("cfg",cfg);setSyncDot("ok");if(!silent)toast(`產品已同步到 PRODUCTS：${res.count||prods.length} 款 ✓`,"ok");return{synced:true,count:res.count||prods.length}}
+ const payload={action:"saveProducts",products:prods.map(cleanProduct),updatedAt:cfg.productsUpdatedAt};
+ return ensureSheets(true)
+  .then(()=>postSheet(payload))
+  .then(res=>{
+   if(postOk(res)){
+    cfg.productsSynced=true;
+    if(res.updatedAt)cfg.productsUpdatedAt=res.updatedAt;
+    sv("cfg",cfg);setSyncDot("ok");
+    const note=res.blind?"已送出，請等幾秒再開 Google Sheet 檢查":"已同步到 PRODUCTS";
+    if(!silent)toast(`產品${note}：${res.count||prods.length} 款 ✓`,"ok");
+    return{synced:true,count:res.count||prods.length,blind:!!res.blind};
+   }
    cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗："+(res.message||"unknown error"),"err");return{synced:false};
-  }).catch(err=>{cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");if(!silent)toast("產品同步失敗："+(err&&err.message?err.message:err),"err");return{synced:false}});
+  }).catch(err=>{
+   cfg.productsSynced=false;sv("cfg",cfg);setSyncDot("err");
+   const msg=err&&err.message?err.message:String(err);
+   console.warn("Product sync failed",msg,payload);
+   if(!silent)toast("產品同步失敗："+msg,"err");
+   return{synced:false,error:msg};
+  });
 }
 function pullProducts(silent,force){
  if(!cfg.sheetsUrl)return Promise.resolve({updated:0});
