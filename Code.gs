@@ -1,4 +1,4 @@
-// v21.1 備註穩定版
+// v21.3 優惠門檻修正版
 const SHEET_NAME = "Orders";
 const PRODUCT_SHEET_NAME = "PRODUCTS";
 const PRODUCT_SHEET_ALIASES = ["Products", "products"];
@@ -37,7 +37,8 @@ const PRODUCT_HEADERS = [
   "rem",
   "on",
   "updatedAt",
-  "discountable"
+  "discountable",
+  "thresholdable"
 ];
 
 function doGet(e) {
@@ -327,11 +328,13 @@ function applyProductValidations_(sheet) {
   const catCol = PRODUCT_HEADERS.indexOf("cat") + 1;
   const onCol = PRODUCT_HEADERS.indexOf("on") + 1;
   const discountCol = PRODUCT_HEADERS.indexOf("discountable") + 1;
+  const thresholdCol = PRODUCT_HEADERS.indexOf("thresholdable") + 1;
   const checkbox = SpreadsheetApp.newDataValidation().requireCheckbox().build();
   const catRule = SpreadsheetApp.newDataValidation().requireValueInList(PRODUCT_CATEGORIES, true).setAllowInvalid(false).build();
   if (catCol > 0) sheet.getRange(2, catCol, maxRows, 1).setDataValidation(catRule);
   if (onCol > 0) sheet.getRange(2, onCol, maxRows, 1).setDataValidation(checkbox);
   if (discountCol > 0) sheet.getRange(2, discountCol, maxRows, 1).setDataValidation(checkbox);
+  if (thresholdCol > 0) sheet.getRange(2, thresholdCol, maxRows, 1).setDataValidation(checkbox);
 }
 
 function getIds_(sheet) {
@@ -406,7 +409,8 @@ function normaliseProduct_(product, updatedAt) {
     rem: String(product.rem || ""),
     on: parseBool_(product.on, true),
     updatedAt: product.updatedAt || updatedAt || new Date().toISOString(),
-    discountable: parseBool_(product.discountable, cat !== "其他")
+    discountable: parseBool_(product.discountable, cat !== "其他"),
+    thresholdable: parseBool_(product.thresholdable, true)
   };
 }
 
@@ -424,7 +428,8 @@ function productToRow_(product, updatedAt) {
     p.rem,
     Boolean(p.on),
     p.updatedAt || updatedAt,
-    Boolean(p.discountable)
+    Boolean(p.discountable),
+    Boolean(p.thresholdable)
   ];
 }
 
@@ -442,7 +447,8 @@ function rowToProduct_(row) {
     rem: String(row[8] || ""),
     on: parseBool_(row[9], true),
     updatedAt: row[10] || "",
-    discountable: parseBool_(row[11], cat !== "其他")
+    discountable: parseBool_(row[11], cat !== "其他"),
+    thresholdable: parseBool_(row[12], true)
   };
 }
 

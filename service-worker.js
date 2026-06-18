@@ -1,4 +1,4 @@
-const CACHE_NAME = "catstaste-order-v21-2-whatsapp-confirm";
+const CACHE_NAME = "catstaste-order-v21-3-discount-threshold";
 const CORE_ASSETS = [
   "./",
   "./index.html",

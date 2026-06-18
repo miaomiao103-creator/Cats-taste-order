@@ -237,7 +237,7 @@ textarea.mi{resize:none;min-height:55px}
    </div>
    <div class="ss">
     <div class="sg"><div class="sgt">優惠設定</div><div class="scard">
-     <div class="srow" onclick="eCfgN('discountThreshold','九折門檻金額 ($)')"><div class="si">🏷️</div><div class="st"><div class="ti">滿 $<span id="sd">150</span> 享九折</div><div class="su">原箱價不適用</div></div><div class="sa">修改</div></div>
+     <div class="srow" onclick="eCfgN('discountThreshold','九折門檻金額 ($)')"><div class="si">🏷️</div><div class="st"><div class="ti">滿 $<span id="sd">150</span> 享九折</div><div class="su">滿額後，只扣可九折單件產品</div></div><div class="sa">修改</div></div>
      <div class="srow" onclick="eGift()"><div class="si">🎁</div><div class="st"><div class="ti">滿 $<span id="sg2">150</span> 送贈品</div><div class="su" id="sgn">趣味發聲匙扣</div></div><div class="sa">修改</div></div>
      <div class="srow" onclick="eCfgN('freeShipThreshold','免費送貨門檻 ($)')"><div class="si">🚚</div><div class="st"><div class="ti">滿 $<span id="sf2">800</span> 免費送貨</div><div class="su">以折後金額計算</div></div><div class="sa">修改</div></div>
     </div></div>
@@ -365,6 +365,7 @@ textarea.mi{resize:none;min-height:55px}
   <div class="slbl">產品名稱</div><input id="np-n" class="mi" type="text" placeholder="名稱" autocomplete="off">
   <div class="slbl">系列類別</div><select id="np-c" class="mi"></select>
   <label class="ckrow"><input id="np-d" type="checkbox"> 參與滿 $150 九折優惠</label>
+  <label class="ckrow"><input id="np-t" type="checkbox" checked> 計入滿 $150 / 贈品門檻</label>
   <div class="prow">
    <div style="flex:1"><div class="slbl">單件價 ($)</div><input id="np-p" class="mi" type="number" placeholder="0" style="margin-bottom:0"></div>
    <div style="flex:1"><div class="slbl">原箱價 ($)</div><input id="np-b" class="mi" type="number" placeholder="－" style="margin-bottom:0"></div>
@@ -390,6 +391,7 @@ textarea.mi{resize:none;min-height:55px}
   <input id="ep-id" type="hidden">
   <div class="slbl">系列類別</div><select id="ep-c" class="mi"></select>
   <label class="ckrow"><input id="ep-d" type="checkbox"> 參與滿 $150 九折優惠</label>
+  <label class="ckrow"><input id="ep-t" type="checkbox"> 計入滿 $150 / 贈品門檻</label>
   <div class="slbl">名稱</div><input id="ep-n" class="mi" type="text" autocomplete="off">
   <div class="prow">
    <div style="flex:1"><div class="slbl">單件價</div><input id="ep-p" class="mi" type="number" style="margin-bottom:0"></div>
@@ -485,8 +487,9 @@ const SER=[
 const PRODUCT_CATS=["美味","健康","主食罐","幼貓","老年","小食","玩具","福袋","其他"];
 function catOptions(selected){return PRODUCT_CATS.map(c=>`<option value="${c}"${c===(selected||"")?" selected":""}>${c}</option>`).join("")}
 function isDiscountable(p){return !!p&&p.discountable===true}
-const APP_VERSION="v21.2";
-const APP_VERSION_LABEL="v21.2 WhatsApp 確認版";
+function isThresholdable(p){return !!p&&p.thresholdable!==false}
+const APP_VERSION="v21.3";
+const APP_VERSION_LABEL="v21.3 優惠門檻修正版";
 
 const SURL="https://script.google.com/macros/s/AKfycbxIDvHAy04153u3nZ2SamO0JOkLRS2yrm-4patPt0lwUW0v45vhygynd7cge_jy0DWy/exec";
 let cfg={discountThreshold:150,giftThreshold:150,giftName:"趣味發聲匙扣",freeShipThreshold:800,sheetsUrl:SURL};
@@ -509,7 +512,7 @@ function loadAll(){
  cfg={...cfg,...ld("cfg",{})};prods=ld("prods",FB);orders=ld("orders",[]);cart=ld("cart",{});
  if(!cfg.sheetsUrl){cfg.sheetsUrl=SURL;sv("cfg",cfg)}
  let pChanged=normProdCats(prods);
- prods.forEach(p=>{if(!PRODUCT_CATS.includes(String(p.cat||""))){p.cat="其他";pChanged=true}if(p.discountable==null){p.discountable=p.cat!=="其他";pChanged=true}});
+ prods.forEach(p=>{if(!PRODUCT_CATS.includes(String(p.cat||""))){p.cat="其他";pChanged=true}if(p.discountable==null){p.discountable=p.cat!=="其他";pChanged=true}if(p.thresholdable==null){p.thresholdable=true;pChanged=true}});
  if(pChanged)sv("prods",prods);
  let changed=false;
  orders.forEach(o=>{
@@ -533,16 +536,17 @@ function touchProducts(product){
 // ─── CART ────────────────────────────────────────
 function gP(id){return prods.find(p=>p.id===id)}
 function calc(){
- let sub=0,disc=0,items=[];
+ let sub=0,thresholdSub=0,disc=0,items=[];
  for(const[id,ci]of Object.entries(cart)){
   const bq=ci.boxQty||0,pq=ci.packQty||0;if(!bq&&!pq)continue;
   const p=gP(id);if(!p)continue;
   const bl=p.bp?bq*p.bp:0,pl=pq*p.up,lt=bl+pl;
+  if(isThresholdable(p))thresholdSub+=lt;
   if(isDiscountable(p))disc+=pl;
   sub+=lt;if(lt>0)items.push({id,p,ci,bl,pl,lt,bq,pq});
  }
- const el=disc>=cfg.discountThreshold&&disc>0,da=el?disc*.1:0,tot=sub-da;
- return{sub,da,tot,el,freeShip:tot>=cfg.freeShipThreshold,hasGift:sub>=cfg.giftThreshold,items};
+ const el=thresholdSub>=cfg.discountThreshold&&disc>0,da=el?disc*.1:0,tot=sub-da;
+ return{sub,thresholdSub,discountableSub:disc,da,tot,el,freeShip:tot>=cfg.freeShipThreshold,hasGift:thresholdSub>=cfg.giftThreshold,items};
 }
 function sPQ(id,q){
  if(!cart[id])cart[id]={packQty:0,boxQty:0};
@@ -619,6 +623,7 @@ function rProds(){
      <span class="ptag pt-u">🍬 單件 $${p.up}/件</span>
      ${hb?`<span class="ptag pt-b">📦 原箱 $${p.bp}（${p.bq}件）</span>`:""}
      ${!isDiscountable(p)?`<span class="ptag" style="background:rgba(210,153,34,.12);color:var(--yellow);border:1px solid rgba(210,153,34,.35)">不參與九折</span>`:""}
+     ${!isThresholdable(p)?`<span class="ptag" style="background:rgba(139,148,158,.12);color:var(--t2);border:1px solid rgba(139,148,158,.35)">不計滿額</span>`:""}
     </div>
     <div class="qrow">
      ${hb?`<div class="qblk">
@@ -1130,7 +1135,7 @@ function sheetGet(action){
 function maxProductUpdatedAt(list){return list.reduce((m,p)=>(p.updatedAt||"")>m?p.updatedAt:m,"")}
 function cleanProduct(p){
  const cat=PRODUCT_CATS.includes(String(p.cat||""))?String(p.cat):"其他";
- return {...p,cat,up:Number(p.up||0),bp:p.bp==null||p.bp===""?null:Number(p.bp||0),bq:Number(p.bq||0),on:p.on!==false,discountable:p.discountable===true};
+ return {...p,cat,up:Number(p.up||0),bp:p.bp==null||p.bp===""?null:Number(p.bp||0),bq:Number(p.bq||0),on:p.on!==false,discountable:p.discountable===true,thresholdable:p.thresholdable!==false};
 }
 function ensureSheets(silent){
  if(!cfg.sheetsUrl){if(!silent)toast("未設定 Sheets URL","err");return Promise.resolve({ok:false})}
@@ -1294,6 +1299,7 @@ function oAddP(){
  ["np-n","np-p","np-b","np-bq","np-r"].forEach(id=>document.getElementById(id).value="");
  document.getElementById("np-c").innerHTML=catOptions("其他");
  document.getElementById("np-d").checked=false;
+ document.getElementById("np-t").checked=true;
  openM("m-ap");
 }
 function saveNP(){
@@ -1304,8 +1310,9 @@ function saveNP(){
  const bq=parseInt(document.getElementById("np-bq").value)||0;
  const rem=document.getElementById("np-r").value.trim();
  const discountable=document.getElementById("np-d").checked;
+ const thresholdable=document.getElementById("np-t").checked;
  if(!name||!up){toast("請填寫名稱及單件價","err");return}
- const product={id:"C"+Date.now(),sku:"CUSTOM",cat,name,spec:bp?"包裝":"其他",up,bp,bq,rem,on:true,discountable};
+ const product={id:"C"+Date.now(),sku:"CUSTOM",cat,name,spec:bp?"包裝":"其他",up,bp,bq,rem,on:true,discountable,thresholdable};
  prods.push(product);
  touchProducts(product);rSerBar();rProds();rSettings();closeM("m-ap");toast("已新增 ✓","ok");syncProducts(true);
 }
@@ -1313,10 +1320,11 @@ function oProdAdmin(){
  document.getElementById("m-pab").innerHTML=prods.map(p=>`
   <div style="display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);gap:7px">
    <div style="flex:1;font-size:12px;line-height:1.4">${p.name.split("\n")[0]}<br>
-    <span style="color:var(--t3)">${p.cat} · 單件$${p.up}${p.bp?` · 原箱$${p.bp}(${p.bq}件)`:""} · ${isDiscountable(p)?"可九折":"不九折"}</span>
+    <span style="color:var(--t3)">${p.cat} · 單件$${p.up}${p.bp?` · 原箱$${p.bp}(${p.bq}件)`:""} · ${isDiscountable(p)?"可九折":"不九折"} · ${isThresholdable(p)?"計滿額":"不計滿額"}</span>
    </div>
    <button class="mini-toggle" style="background:rgba(122,171,240,.12);color:var(--brand)" onclick="oEP('${p.id}')">✏️</button>
    <button class="mini-toggle" style="background:${isDiscountable(p)?"rgba(63,185,80,.12)":"rgba(210,153,34,.12)"};color:${isDiscountable(p)?"var(--green)":"var(--yellow)"}" onclick="togDisc('${p.id}')">${isDiscountable(p)?"九折✓":"不九折"}</button>
+   <button class="mini-toggle" style="background:${isThresholdable(p)?"rgba(88,166,255,.12)":"var(--sf3)"};color:${isThresholdable(p)?"var(--blue)":"var(--t3)"}" onclick="togThres('${p.id}')">${isThresholdable(p)?"計滿額":"不計"}</button>
    <button class="mini-toggle" style="background:${p.on?"rgba(63,185,80,.12)":"var(--sf3)"};color:${p.on?"var(--green)":"var(--t3)"}" onclick="togOn('${p.id}')">${p.on?"上架":"停用"}</button>
   </div>`).join("");
  openM("m-pa");
@@ -1326,6 +1334,7 @@ function oEP(id){
  document.getElementById("ep-id").value=id;
  document.getElementById("ep-c").innerHTML=catOptions(p.cat||"其他");
  document.getElementById("ep-d").checked=isDiscountable(p);
+ document.getElementById("ep-t").checked=isThresholdable(p);
  document.getElementById("ep-n").value=p.name;
  document.getElementById("ep-p").value=p.up;document.getElementById("ep-b").value=p.bp||"";
  document.getElementById("ep-bq").value=p.bq||"";document.getElementById("ep-r").value=p.rem||"";
@@ -1335,6 +1344,7 @@ function saveEP(){
  const id=document.getElementById("ep-id").value,p=prods.find(x=>x.id===id);if(!p)return;
  p.cat=PRODUCT_CATS.includes(document.getElementById("ep-c").value)?document.getElementById("ep-c").value:"其他";
  p.discountable=document.getElementById("ep-d").checked;
+ p.thresholdable=document.getElementById("ep-t").checked;
  p.name=document.getElementById("ep-n").value.trim()||p.name;
  p.up=parseFloat(document.getElementById("ep-p").value)||p.up;
  p.bp=parseFloat(document.getElementById("ep-b").value)||null;
@@ -1343,6 +1353,7 @@ function saveEP(){
  touchProducts(p);rSerBar();rProds();oProdAdmin();closeM("m-ep");toast("已儲存 ✓","ok");syncProducts(true);
 }
 function togDisc(id){const p=prods.find(x=>x.id===id);if(p){p.discountable=!isDiscountable(p);touchProducts(p);rProds();rCart();oProdAdmin();syncProducts(true)}}
+function togThres(id){const p=prods.find(x=>x.id===id);if(p){p.thresholdable=!isThresholdable(p);touchProducts(p);rProds();rCart();oProdAdmin();syncProducts(true)}}
 function togOn(id){const p=prods.find(x=>x.id===id);if(p){p.on=!p.on;touchProducts(p);rSerBar();rProds();oProdAdmin();syncProducts(true)}}
 function rSettings(){
  document.getElementById("sd").textContent=cfg.discountThreshold;
