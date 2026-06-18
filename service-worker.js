@@ -1,4 +1,4 @@
-const CACHE_NAME = "catstaste-order-v21-3-discount-threshold";
+const CACHE_NAME = "catstaste-order-v21-3-1-qa-fix";
 const CORE_ASSETS = [
   "./",
   "./index.html",
