@@ -1,6 +1,8 @@
+// v21.1 備註穩定版
 const SHEET_NAME = "Orders";
 const PRODUCT_SHEET_NAME = "PRODUCTS";
 const PRODUCT_SHEET_ALIASES = ["Products", "products"];
+const PRODUCT_CATEGORIES = ["美味", "健康", "主食罐", "幼貓", "老年", "小食", "玩具", "福袋", "其他"];
 const HEADERS = [
   "id",
   "at",
@@ -20,7 +22,8 @@ const HEADERS = [
   "courier",
   "waConf",
   "waShip",
-  "staffNote"
+  "publicNote",
+  "privateNote"
 ];
 const PRODUCT_HEADERS = [
   "id",
@@ -33,7 +36,8 @@ const PRODUCT_HEADERS = [
   "bq",
   "rem",
   "on",
-  "updatedAt"
+  "updatedAt",
+  "discountable"
 ];
 
 function doGet(e) {
@@ -111,7 +115,8 @@ function normaliseOrderAliases_(order) {
   order.name = order.name || order.customerName || order.customer || order.recipientName || "";
   order.phone = order.phone || order.tel || order.mobile || order.customerPhone || "";
   order.addr = order.addr || order.address || order.deliveryAddress || order.shippingAddress || "";
-  order.staffNote = order.staffNote || order.staffRemark || order.internalNote || order.note || order.remark || "";
+  order.publicNote = order.publicNote || order.note || order.customerNote || order.orderNote || "";
+  order.privateNote = order.privateNote || order.internalNote || order.staffNote || order.secretNote || "";
 
   if (order.sub == null || order.sub === "") order.sub = order.subtotal || order.originalTotal || 0;
   if (order.da == null || order.da === "") order.da = order.discountAmount || order.discount || 0;
@@ -135,7 +140,6 @@ function hasMeaningfulOrderData_(order) {
     order.name ||
     order.phone ||
     order.addr ||
-    order.staffNote ||
     order.trackingNo ||
     (Array.isArray(order.items) && order.items.length) ||
     Number(order.tot || order.total || order.amount || 0)
@@ -193,18 +197,24 @@ function upsertOrder_(order) {
 }
 
 function ensureSheets_() {
-  const orderSheet = getSheet_();
-  const productSheet = getProductSheet_();
-  return {
-    orderSheet: orderSheet.getName(),
-    productSheet: productSheet.getName(),
-    orderRows: Math.max(orderSheet.getLastRow() - 1, 0),
-    productRows: Math.max(productSheet.getLastRow() - 1, 0),
-    headers: {
-      orders: HEADERS,
-      products: PRODUCT_HEADERS
-    }
-  };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const orderSheet = getSheet_();
+    const productSheet = getProductSheet_();
+    return {
+      orderSheet: orderSheet.getName(),
+      productSheet: productSheet.getName(),
+      orderRows: Math.max(orderSheet.getLastRow() - 1, 0),
+      productRows: Math.max(productSheet.getLastRow() - 1, 0),
+      headers: {
+        orders: HEADERS,
+        products: PRODUCT_HEADERS
+      }
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getOrders_() {
@@ -223,15 +233,41 @@ function saveProducts_(products, updatedAt) {
   try {
     const sheet = getProductSheet_();
     const stamp = updatedAt || new Date().toISOString();
-    const rows = products.map(product => productToRow_(product, stamp));
+    const existing = getProducts_();
+    const byId = {};
+    existing.forEach(function(product) {
+      if (product.id) byId[String(product.id)] = product;
+    });
+
+    products.forEach(function(rawProduct) {
+      const product = normaliseProduct_(rawProduct, stamp);
+      if (!product.id) return;
+      const current = byId[String(product.id)];
+      if (current && isNewer_(current.updatedAt, product.updatedAt)) return;
+      byId[String(product.id)] = product;
+    });
+
+    const merged = Object.keys(byId).map(function(id) { return byId[id]; });
+    merged.sort(function(a, b) {
+      return String(a.cat || "").localeCompare(String(b.cat || ""), "zh-Hant") || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant");
+    });
+
+    const rows = merged.map(function(product) { return productToRow_(product, product.updatedAt || stamp); });
     sheet.clearContents();
     sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).setValues([PRODUCT_HEADERS]);
     if (rows.length) sheet.getRange(2, 1, rows.length, PRODUCT_HEADERS.length).setValues(rows);
+    applyProductValidations_(sheet);
     SpreadsheetApp.flush();
-    return { count: rows.length, updatedAt: stamp, sheetName: sheet.getName() };
+    return { count: rows.length, updatedAt: latestProductsUpdatedAt_(merged) || stamp, sheetName: sheet.getName() };
   } finally {
     lock.releaseLock();
   }
+}
+
+function isNewer_(a, b) {
+  if (!a) return false;
+  if (!b) return true;
+  return new Date(a).getTime() > new Date(b).getTime();
 }
 
 function getProducts_() {
@@ -282,7 +318,20 @@ function getProductSheet_() {
   const current = sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).getValues()[0];
   const hasHeaders = PRODUCT_HEADERS.every((header, index) => current[index] === header);
   if (!hasHeaders) sheet.getRange(1, 1, 1, PRODUCT_HEADERS.length).setValues([PRODUCT_HEADERS]);
+  applyProductValidations_(sheet);
   return sheet;
+}
+
+function applyProductValidations_(sheet) {
+  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const catCol = PRODUCT_HEADERS.indexOf("cat") + 1;
+  const onCol = PRODUCT_HEADERS.indexOf("on") + 1;
+  const discountCol = PRODUCT_HEADERS.indexOf("discountable") + 1;
+  const checkbox = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+  const catRule = SpreadsheetApp.newDataValidation().requireValueInList(PRODUCT_CATEGORIES, true).setAllowInvalid(false).build();
+  if (catCol > 0) sheet.getRange(2, catCol, maxRows, 1).setDataValidation(catRule);
+  if (onCol > 0) sheet.getRange(2, onCol, maxRows, 1).setDataValidation(checkbox);
+  if (discountCol > 0) sheet.getRange(2, discountCol, maxRows, 1).setDataValidation(checkbox);
 }
 
 function getIds_(sheet) {
@@ -311,7 +360,8 @@ function orderToRow_(order) {
     order.courier || detectCourier_(order.trackingNo || ""),
     Boolean(order.waConf),
     Boolean(order.waShip),
-    order.staffNote || ""
+    order.publicNote || "",
+    order.privateNote || ""
   ];
 }
 
@@ -335,41 +385,71 @@ function rowToOrder_(row) {
     courier: row[15] || detectCourier_(row[14] || ""),
     waConf: row[16] === true || row[16] === "TRUE",
     waShip: row[17] === true || row[17] === "TRUE",
-    staffNote: String(row[18] || ""),
+    publicNote: String(row[18] || ""),
+    privateNote: String(row[19] || ""),
     synced: true
   };
 }
 
+function normaliseProduct_(product, updatedAt) {
+  product = product && typeof product === "object" ? product : {};
+  const cat = PRODUCT_CATEGORIES.indexOf(String(product.cat || "")) >= 0 ? String(product.cat || "") : "其他";
+  return {
+    id: String(product.id || product.sku || Utilities.getUuid()).trim(),
+    sku: String(product.sku || ""),
+    cat: cat,
+    name: String(product.name || ""),
+    spec: String(product.spec || ""),
+    up: Number(product.up || 0),
+    bp: product.bp == null || product.bp === "" ? null : Number(product.bp || 0),
+    bq: Number(product.bq || 0),
+    rem: String(product.rem || ""),
+    on: parseBool_(product.on, true),
+    updatedAt: product.updatedAt || updatedAt || new Date().toISOString(),
+    discountable: parseBool_(product.discountable, cat !== "其他")
+  };
+}
+
 function productToRow_(product, updatedAt) {
+  const p = normaliseProduct_(product, updatedAt);
   return [
-    product.id || "",
-    product.sku || "",
-    product.cat || "",
-    product.name || "",
-    product.spec || "",
-    Number(product.up || 0),
-    product.bp == null || product.bp === "" ? "" : Number(product.bp || 0),
-    Number(product.bq || 0),
-    product.rem || "",
-    product.on !== false,
-    product.updatedAt || updatedAt
+    p.id,
+    p.sku,
+    p.cat,
+    p.name,
+    p.spec,
+    Number(p.up || 0),
+    p.bp == null || p.bp === "" ? "" : Number(p.bp || 0),
+    Number(p.bq || 0),
+    p.rem,
+    Boolean(p.on),
+    p.updatedAt || updatedAt,
+    Boolean(p.discountable)
   ];
 }
 
 function rowToProduct_(row) {
+  const cat = PRODUCT_CATEGORIES.indexOf(String(row[2] || "")) >= 0 ? String(row[2] || "") : "其他";
   return {
     id: String(row[0] || ""),
     sku: String(row[1] || ""),
-    cat: String(row[2] || ""),
+    cat: cat,
     name: String(row[3] || ""),
     spec: String(row[4] || ""),
     up: Number(row[5] || 0),
     bp: row[6] === "" ? null : Number(row[6] || 0),
     bq: Number(row[7] || 0),
     rem: String(row[8] || ""),
-    on: row[9] !== false && row[9] !== "FALSE",
-    updatedAt: row[10] || ""
+    on: parseBool_(row[9], true),
+    updatedAt: row[10] || "",
+    discountable: parseBool_(row[11], cat !== "其他")
   };
+}
+
+function parseBool_(value, defaultValue) {
+  if (value === "" || value == null) return defaultValue;
+  if (value === false || value === "FALSE" || value === "false" || value === 0 || value === "0") return false;
+  return true;
 }
 
 function latestProductsUpdatedAt_(products) {
@@ -419,7 +499,6 @@ function testDoPost_upsertOrder() {
           name: "Test Customer",
           phone: "91234567",
           addr: "Test Address",
-          staffNote: "同事備註測試",
           items: [
             { sku: "P001", name: "Test Product", bq: 0, pq: 1, up: 120, bl: 0, pl: 120, lt: 120 }
           ],
